@@ -3,4 +3,6 @@ tgcrypto
 motor
 pymongo
 python-dotenv
-uvloop; platform_system != 'Windows'
+uvloop
+cinemagoer
+; platform_system != 'Windows'

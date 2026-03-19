@@ -27,6 +27,36 @@ class Database:
             "requested_at": datetime.utcnow()
         })
 
+    async def get_all_requests(self, limit=50):
+        """Returns all movie requests for admins."""
+        cursor = self.requests.find().sort("requested_at", -1)
+        return await cursor.to_list(length=limit)
+
+    async def delete_all_requests(self):
+        """Clears all requests."""
+        await self.requests.delete_many({})
+
+    async def add_to_history(self, user_id: int, query: str):
+        """Adds a query to the user's search history."""
+        # Store as $push to a list in the user document, keeping last 5
+        await self.users.update_one(
+            {"user_id": user_id},
+            {
+                "$push": {
+                    "history": {
+                        "$each": [query],
+                        "$slice": -5
+                    }
+                }
+            },
+            upsert=True
+        )
+
+    async def get_history(self, user_id: int):
+        """Retrieves search history for a user."""
+        user = await self.users.find_one({"user_id": user_id})
+        return user.get("history", []) if user else []
+
     async def get_total_users(self):
         return await self.users.count_documents({})
 

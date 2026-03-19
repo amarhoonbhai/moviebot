@@ -3,6 +3,7 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, 
 from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, FORCE_SUB_CHANNEL
 from parser import parse_movie_data
 from database import db
+from metadata_helper import get_movie_metadata
 import logging
 import asyncio
 
@@ -120,6 +121,33 @@ async def broadcast_cmd(client, message: Message):
     
     await msg.edit_text(f"✅ Broadcast sent to `{count}` users.")
 
+@bot.on_message(filters.command("requests") & filters.user(ADMIN_IDS))
+async def requests_cmd(client, message: Message):
+    """Admin command to view user requests."""
+    reqs = await db.get_all_requests()
+    if not reqs:
+        return await message.reply_text("📋 No active requests!")
+    
+    text = "📋 **Recent Movie Requests**\n\n"
+    for i, r in enumerate(reqs, 1):
+        text += f"{i}. `{r['query']}` (User: `{r['user_id']}`)\n"
+    
+    buttons = [[InlineKeyboardButton("🗑️ Clear All", callback_data="clear_reqs")]]
+    await message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+
+@bot.on_message(filters.command("history") & filters.private)
+async def history_cmd(client, message: Message):
+    """Show user search history."""
+    history = await db.get_history(message.from_user.id)
+    if not history:
+        return await message.reply_text("📜 Your search history is empty!")
+    
+    text = "📜 **Your Recent Searches**\n\n"
+    for i, q in enumerate(history, 1):
+        text += f"{i}. `{q}`\n"
+    
+    await message.reply_text(text)
+
 @bot.on_message(filters.command("top") & (filters.private | filters.group))
 async def top_cmd(client, message: Message):
     """Show trending movies."""
@@ -165,10 +193,11 @@ async def search_cmd(client, message: Message):
     if len(message.command) < 2:
         return await message.reply_text("❌ Please provide a movie name to search.\nExample: `/search avengers`")
     
-    # Track user
-    await db.add_user(message.from_user.id)
-    
+    # Track user and history
+    await db.add_user(user_id)
     query = " ".join(message.command[1:])
+    await db.add_to_history(user_id, query)
+    
     results = await db.search_movies(query)
     
     if not results:
@@ -186,10 +215,21 @@ async def search_cmd(client, message: Message):
 
     is_group = message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]
     
+    # Fetch metadata for the first result to show a nice card
+    first_key = list(results.keys())[0]
+    metadata = await get_movie_metadata(results[first_key]['movie_name'], results[first_key]['year'])
+
     for key, data in results.items():
         year_str = f"({data['year']})" if data['year'] else ""
-        text = f"🎬 **{data['movie_name']} {year_str}**\n\n"
-        text += "Select quality to download:"
+        
+        if metadata and key == first_key:
+            text = f"🎬 **{metadata['title']} {year_str}** | ⭐ `{metadata['rating']}`\n\n"
+            text += f"📝 **Plot:** {metadata['plot'][:200]}...\n\n"
+            text += "Select quality to download:"
+        else:
+            text = f"🎬 **{data['movie_name']} {year_str}**\n\n"
+            text += "Select quality to download:"
+
         if is_group:
             text += "\n\n🗑️ _This message will be deleted in 60s._"
         
@@ -206,7 +246,15 @@ async def search_cmd(client, message: Message):
         if row:
             buttons.append(row)
             
-        sent_msg = await message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+        if metadata and key == first_key and metadata['poster']:
+            sent_msg = await message.reply_photo(
+                photo=metadata['poster'],
+                caption=text,
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+        else:
+            sent_msg = await message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+
         if is_group:
             asyncio.create_task(delete_after_delay(sent_msg, 60))
             asyncio.create_task(delete_after_delay(message, 60))
@@ -255,6 +303,16 @@ async def download_handler(client, callback: CallbackQuery):
             caption=caption
         )
         asyncio.create_task(delete_after_delay(sent_file, 1200))
+
+@bot.on_callback_query(filters.regex(r'^clear_reqs'))
+async def clear_reqs_handler(client, callback: CallbackQuery):
+    """Handles admin request clearing."""
+    if callback.from_user.id not in ADMIN_IDS:
+        return await callback.answer("❌ Unauthorised!", show_alert=True)
+    
+    await db.delete_all_requests()
+    await callback.answer("✅ All requests cleared!")
+    await callback.message.edit_text("📋 **Requests cleared!**")
 
 if __name__ == "__main__":
     bot.run()
