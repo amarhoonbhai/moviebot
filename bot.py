@@ -172,7 +172,17 @@ async def search_cmd(client, message: Message):
     results = await db.search_movies(query)
     
     if not results:
-        return await message.reply_text("😔 Sorry, no movies found matching your search.")
+        await db.save_request(query, user_id)
+        text = (
+            f"😔 **Movie Not Found!**\n\n"
+            f"Sorry, we couldn't find `{query}` in our database.\n\n"
+            "✅ **Your request has been added!** We will try to upload it soon."
+        )
+        sent_msg = await message.reply_text(text)
+        if is_group:
+            asyncio.create_task(delete_after_delay(sent_msg, 60))
+            asyncio.create_task(delete_after_delay(message, 60))
+        return
 
     is_group = message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]
     

@@ -9,6 +9,7 @@ class Database:
         self.db = self.client[DATABASE_NAME]
         self.files = self.db.files
         self.users = self.db.users
+        self.requests = self.db.requests
 
     async def add_user(self, user_id: int):
         """Adds a new user if they don't exist."""
@@ -17,6 +18,14 @@ class Database:
             {"$set": {"user_id": user_id}},
             upsert=True
         )
+
+    async def save_request(self, query: str, user_id: int):
+        """Saves a movie request from a user."""
+        await self.requests.insert_one({
+            "query": query,
+            "user_id": user_id,
+            "requested_at": datetime.utcnow()
+        })
 
     async def get_total_users(self):
         return await self.users.count_documents({})
