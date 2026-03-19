@@ -1,6 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import DATABASE_URL, DATABASE_NAME
 from datetime import datetime
+from bson import ObjectId
 
 class Database:
     def __init__(self):
@@ -89,12 +90,16 @@ class Database:
                 "quality": item["quality"],
                 "language": item["movie_language"],
                 "file_id": item["file_id"],
-                "message_id": item["message_id"]
+                "message_id": item["message_id"],
+                "db_id": str(item["_id"])
             })
             
         return grouped
 
     async def get_file_by_id(self, file_id: str):
         return await self.files.find_one({"file_id": file_id})
+
+    async def get_file_by_db_id(self, db_id: str):
+        return await self.files.find_one({"_id": ObjectId(db_id)})
 
 db = Database()

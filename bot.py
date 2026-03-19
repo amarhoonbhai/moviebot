@@ -140,7 +140,7 @@ async def search_cmd(client, message: Message):
         row = []
         for file in sorted_files:
             btn_text = f"[{file['quality']}]"
-            row.append(InlineKeyboardButton(btn_text, callback_data=f"dl_{file['file_id']}"))
+            row.append(InlineKeyboardButton(btn_text, callback_data=f"dl_{file['db_id']}"))
             if len(row) == 2:
                 buttons.append(row)
                 row = []
@@ -152,8 +152,8 @@ async def search_cmd(client, message: Message):
 @bot.on_callback_query(filters.regex(r'^dl_'))
 async def download_handler(client, callback: CallbackQuery):
     """Handles quality button clicks with tracking and copy_message."""
-    file_id = callback.data.split("_")[1]
-    file_data = await db.get_file_by_id(file_id)
+    db_id = callback.data.split("_")[1]
+    file_data = await db.get_file_by_db_id(db_id)
     
     if not file_data:
         return await callback.answer("❌ File not found in database.", show_alert=True)
@@ -177,7 +177,7 @@ async def download_handler(client, callback: CallbackQuery):
         # Fallback to cached media if copy fails (e.g. message deleted)
         await client.send_cached_media(
             chat_id=callback.from_user.id,
-            file_id=file_id,
+            file_id=file_data["file_id"],
             caption=f"🎬 **{file_data['movie_name']}**\n💿 Quality: {file_data['quality']}\n🌐 Language: {file_data['movie_language']}"
         )
 
