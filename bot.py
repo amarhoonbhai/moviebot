@@ -1,6 +1,6 @@
 from pyrogram import Client, filters, enums
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS
+from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, FORCE_SUB_CHANNEL
 from parser import parse_movie_data
 from database import db
 import logging
@@ -61,6 +61,18 @@ async def delete_after_delay(message: Message, delay: int):
         await message.delete()
     except Exception:
         pass
+
+async def is_subscribed(client, user_id):
+    """Checks if a user is subscribed to the forced channel."""
+    if not FORCE_SUB_CHANNEL:
+        return True
+    try:
+        member = await client.get_chat_member(FORCE_SUB_CHANNEL, user_id)
+        if member.status in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.MEMBER]:
+            return True
+    except Exception:
+        pass
+    return False
 
 @bot.on_message(filters.command("start") & (filters.private | filters.group))
 async def start_cmd(client, message: Message):
@@ -130,7 +142,26 @@ async def top_cmd(client, message: Message):
 
 @bot.on_message(filters.command("search") & (filters.private | filters.group))
 async def search_cmd(client, message: Message):
-    """Search for movies and display grouped results."""
+    """Search for movies and display grouped results with FSUB check."""
+    user_id = message.from_user.id
+    
+    # Force Subscription Check
+    if not await is_subscribed(client, user_id):
+        invite_link = f"https://t.me/{FORCE_SUB_CHANNEL.replace('@', '')}"
+        text = (
+            "⚠️ **Access Denied!**\n\n"
+            f"To use the search feature, you must join our update channel: {FORCE_SUB_CHANNEL}\n\n"
+            "Please join and then try searching again!"
+        )
+        buttons = [[
+            InlineKeyboardButton("📢 Join Channel", url=invite_link)
+        ]]
+        sent_msg = await message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+        if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
+            asyncio.create_task(delete_after_delay(sent_msg, 60))
+            asyncio.create_task(delete_after_delay(message, 60))
+        return
+
     if len(message.command) < 2:
         return await message.reply_text("❌ Please provide a movie name to search.\nExample: `/search avengers`")
     
