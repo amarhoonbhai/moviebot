@@ -47,7 +47,7 @@ def test_parser():
         else:
             print(f"Test {i+1}: FAILED")
             print(f"  Input:    {text_to_parse}")
-            print(f"  Actual:   Name='{result['movie_name']}', Year='{result['year']}', Quality='{result['quality']}'")
+            print(f"  Actual:   Name='{result['movie_name']}', Year='{result['year']}', Quality='{result['quality']}', Language='{result['movie_language']}'")
             print(f"  Expected: Name='{case['expected_name']}', Year='{case['expected_year']}', Quality='{case['expected_quality']}'")
             all_passed = False
             

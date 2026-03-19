@@ -26,7 +26,7 @@ class Database:
     async def save_file(self, file_data):
         """
         Saves file data to the database.
-        file_data: {file_id, message_id, movie_name, year, quality, language, movie_key, size}
+        file_data: {file_id, message_id, movie_name, year, quality, movie_language, movie_key, size}
         """
         # Ensure unique index on file_id and quality for the same movie_key
         existing = await self.files.find_one({
@@ -87,7 +87,7 @@ class Database:
                 }
             grouped[key]["files"].append({
                 "quality": item["quality"],
-                "language": item["language"],
+                "language": item["movie_language"],
                 "file_id": item["file_id"],
                 "message_id": item["message_id"]
             })

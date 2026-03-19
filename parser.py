@@ -82,7 +82,7 @@ def parse_movie_data(text: str):
         "movie_name": movie_name,
         "year": year,
         "quality": quality,
-        "language": language,
+        "movie_language": language,
         "movie_key": movie_key.strip()
     }
 

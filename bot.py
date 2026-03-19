@@ -4,6 +4,7 @@ from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS
 from parser import parse_movie_data
 from database import db
 import logging
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -37,7 +38,7 @@ async def auto_index_channel(client, message: Message):
         "movie_name": data["movie_name"],
         "year": data["year"],
         "quality": data["quality"],
-        "language": data["language"],
+        "movie_language": data["movie_language"],
         "movie_key": data["movie_key"],
         "size": file_obj.file_size
     }
@@ -45,6 +46,12 @@ async def auto_index_channel(client, message: Message):
     success = await db.save_file(file_info)
     if success:
         logger.info(f"Indexed: {data['movie_name']} ({data['quality']})")
+        # Send confirmation and auto-delete
+        status_msg = await message.reply_text(
+            f"✅ **Successful Indexed:**\n`{data['movie_name']} ({data['year'] or ''}) [{data['quality']}]`"
+        )
+        await asyncio.sleep(10)
+        await status_msg.delete()
     else:
         logger.info(f"Skipped (Duplicate): {data['movie_name']} ({data['quality']})")
 
@@ -163,7 +170,7 @@ async def download_handler(client, callback: CallbackQuery):
             chat_id=callback.from_user.id,
             from_chat_id=CHANNEL_ID,
             message_id=file_data["message_id"],
-            caption=f"🎬 **{file_data['movie_name']}**\n💿 Quality: {file_data['quality']}\n🌐 Language: {file_data['language']}\n\n✅ Tag: #{file_data['movie_key'].replace(' ', '_')}"
+            caption=f"🎬 **{file_data['movie_name']}**\n💿 Quality: {file_data['quality']}\n🌐 Language: {file_data['movie_language']}\n\n✅ Tag: #{file_data['movie_key'].replace(' ', '_')}"
         )
     except Exception as e:
         logger.error(f"Error copying message: {e}")
@@ -171,7 +178,7 @@ async def download_handler(client, callback: CallbackQuery):
         await client.send_cached_media(
             chat_id=callback.from_user.id,
             file_id=file_id,
-            caption=f"🎬 **{file_data['movie_name']}**\n💿 Quality: {file_data['quality']}\n🌐 Language: {file_data['language']}"
+            caption=f"🎬 **{file_data['movie_name']}**\n💿 Quality: {file_data['quality']}\n🌐 Language: {file_data['movie_language']}"
         )
 
 if __name__ == "__main__":
