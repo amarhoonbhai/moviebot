@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Project specific
+test_results.txt
+test_results_utf8.txt
+movie_bot.session
+movie_bot.session-journal
+
+# OS junk
+.DS_Store
+Thumbs.db
