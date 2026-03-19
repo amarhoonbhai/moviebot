@@ -1,4 +1,4 @@
-from pyrogram import Client, filters
+from pyrogram import Client, filters, enums
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS
 from parser import parse_movie_data
@@ -50,25 +50,33 @@ async def auto_index_channel(client, message: Message):
         status_msg = await message.reply_text(
             f"✅ **Successful Indexed:**\n`{data['movie_name']} ({data['year'] or ''}) [{data['quality']}]`"
         )
-        await asyncio.sleep(10)
-        await status_msg.delete()
+        asyncio.create_task(delete_after_delay(status_msg, 10))
     else:
         logger.info(f"Skipped (Duplicate): {data['movie_name']} ({data['quality']})")
 
-@bot.on_message(filters.command("start") & filters.private)
+async def delete_after_delay(message: Message, delay: int):
+    """Helper to delete a message after a delay."""
+    await asyncio.sleep(delay)
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+@bot.on_message(filters.command("start") & (filters.private | filters.group))
 async def start_cmd(client, message: Message):
-    """Cool welcome message and user tracking."""
+    """Handler for the /start command."""
     await db.add_user(message.from_user.id)
-    welcome_text = (
-        "🎬 **Welcome to Movie Bot Indexer!** 🍿\n\n"
-        "I can help you find and download files from our private collection.\n\n"
-        "🔍 **Commands:**\n"
-        "/search <name> - Find movies\n"
-        "/top - Show trending movies\n"
-        "/help - Show this message\n\n"
-        "Example: `/search dark knight`"
+    text = (
+        "👋 **Welcome to Movie Bot Indexer!**\n\n"
+        "I can help you find movies/files indexed from our private channel.\n\n"
+        "🔍 **How to use:**\n"
+        "Type `/search <movie name>` to find files.\n"
+        "Type `/top` to see trending searches."
     )
-    await message.reply_text(welcome_text)
+    sent_msg = await message.reply_text(text)
+    if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
+        asyncio.create_task(delete_after_delay(sent_msg, 60))
+        asyncio.create_task(delete_after_delay(message, 60))
 
 @bot.on_message(filters.command("stats") & filters.user(ADMIN_IDS))
 async def stats_cmd(client, message: Message):
@@ -100,7 +108,7 @@ async def broadcast_cmd(client, message: Message):
     
     await msg.edit_text(f"✅ Broadcast sent to `{count}` users.")
 
-@bot.on_message(filters.command("top") & filters.private)
+@bot.on_message(filters.command("top") & (filters.private | filters.group))
 async def top_cmd(client, message: Message):
     """Show trending movies."""
     top_movies = await db.get_top_movies()
@@ -112,9 +120,15 @@ async def top_cmd(client, message: Message):
         year_str = f"({movie['year']})" if movie['year'] else ""
         text += f"{i}. **{movie['movie_name']} {year_str}** — `{movie['total_searches']} downloads`\n"
     
-    await message.reply_text(text)
+    if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
+        text += "\n🗑️ _This message will be deleted in 60s._"
+    
+    sent_msg = await message.reply_text(text)
+    if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
+        asyncio.create_task(delete_after_delay(sent_msg, 60))
+        asyncio.create_task(delete_after_delay(message, 60))
 
-@bot.on_message(filters.command("search") & filters.private)
+@bot.on_message(filters.command("search") & (filters.private | filters.group))
 async def search_cmd(client, message: Message):
     """Search for movies and display grouped results."""
     if len(message.command) < 2:
@@ -129,10 +143,14 @@ async def search_cmd(client, message: Message):
     if not results:
         return await message.reply_text("😔 Sorry, no movies found matching your search.")
 
+    is_group = message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]
+    
     for key, data in results.items():
         year_str = f"({data['year']})" if data['year'] else ""
         text = f"🎬 **{data['movie_name']} {year_str}**\n\n"
         text += "Select quality to download:"
+        if is_group:
+            text += "\n\n🗑️ _This message will be deleted in 60s._"
         
         buttons = []
         sorted_files = sorted(data["files"], key=lambda x: x["quality"])
@@ -147,7 +165,10 @@ async def search_cmd(client, message: Message):
         if row:
             buttons.append(row)
             
-        await message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+        sent_msg = await message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+        if is_group:
+            asyncio.create_task(delete_after_delay(sent_msg, 60))
+            asyncio.create_task(delete_after_delay(message, 60))
 
 @bot.on_callback_query(filters.regex(r'^dl_'))
 async def download_handler(client, callback: CallbackQuery):
@@ -158,28 +179,41 @@ async def download_handler(client, callback: CallbackQuery):
     if not file_data:
         return await callback.answer("❌ File not found in database.", show_alert=True)
     
-    await callback.answer("Fetching file from channel...")
+    await callback.answer("Fetching file... 🚀")
     
     # Increment search/download count
     await db.increment_search(file_data["movie_key"])
     
-    # Send the file by copying it from the channel
-    # This ensures it's "fetched" from the source correctly
+    # Target chat: PM or Group
+    target_chat = callback.message.chat.id
+    
+    caption = (
+        f"🎬 **{file_data['movie_name']}**\n"
+        f"💿 Quality: {file_data['quality']}\n"
+        f"🌐 Language: {file_data['movie_language']}\n\n"
+        f"✅ Tag: #{file_data['movie_key'].replace(' ', '_')}\n"
+        "⚠️ **Note: This file will be auto-deleted in 20 minutes.**"
+    )
+
     try:
-        await client.copy_message(
-            chat_id=callback.from_user.id,
+        sent_file = await client.copy_message(
+            chat_id=target_chat,
             from_chat_id=CHANNEL_ID,
             message_id=file_data["message_id"],
-            caption=f"🎬 **{file_data['movie_name']}**\n💿 Quality: {file_data['quality']}\n🌐 Language: {file_data['movie_language']}\n\n✅ Tag: #{file_data['movie_key'].replace(' ', '_')}"
+            caption=caption
         )
+        # Schedule auto-delete after 20 minutes (1200 seconds)
+        asyncio.create_task(delete_after_delay(sent_file, 1200))
+        
     except Exception as e:
         logger.error(f"Error copying message: {e}")
-        # Fallback to cached media if copy fails (e.g. message deleted)
-        await client.send_cached_media(
-            chat_id=callback.from_user.id,
+        # Fallback to cached media
+        sent_file = await client.send_cached_media(
+            chat_id=target_chat,
             file_id=file_data["file_id"],
-            caption=f"🎬 **{file_data['movie_name']}**\n💿 Quality: {file_data['quality']}\n🌐 Language: {file_data['movie_language']}"
+            caption=caption
         )
+        asyncio.create_task(delete_after_delay(sent_file, 1200))
 
 if __name__ == "__main__":
     bot.run()
