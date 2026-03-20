@@ -2,190 +2,163 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from config import DATABASE_URL, DATABASE_NAME
 from datetime import datetime
 from bson import ObjectId
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Database:
     def __init__(self):
         self.client = AsyncIOMotorClient(DATABASE_URL)
         self.db = self.client[DATABASE_NAME]
-        self.files = self.db.files
+        # Professional Collections
         self.users = self.db.users
+        self.files = self.db.files
+        self.search_logs = self.db.search_logs
+        self.quiz = self.db.quiz
         self.requests = self.db.requests
-        self.analytics = self.db.analytics
 
-    async def add_user(self, user_id: int, first_name: str = "", last_name: str = ""):
-        """Adds a new user if they don't exist and updates their name."""
+    async def fix_indexes(self):
+        """Ultra-Professional Index Cleanup & Initialization."""
+        try:
+            # 1. Sanitize Data: Remove any document with null/missing telegram_user_id
+            await self.users.delete_many({"telegram_user_id": None})
+            
+            # 2. Nuclear Cleanup: Drop all non-primary indexes on users
+            indexes = await self.users.index_information()
+            for idx_name in list(indexes.keys()):
+                if idx_name != "_id_":
+                    try:
+                        await self.users.drop_index(idx_name)
+                        logger.info(f"Dropped legacy index: {idx_name}")
+                    except Exception: pass
+            
+            # 3. Apply Professional Unique Indexes
+            await self.users.create_index("telegram_user_id", unique=True)
+            await self.files.create_index("file_unique_id", unique=True)
+            await self.search_logs.create_index("query", unique=True)
+            
+            logger.info("Database schema and indexes standardized! 💎")
+        except Exception as e:
+            logger.error(f"Error during index rebuild: {e}")
+
+    # --- USER MANAGEMENT ---
+    async def save_user(self, user):
+        """Standardized user save system using upsert and atomic operators."""
+        if not user or not user.id: return
+        
         await self.users.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "user_id": user_id,
-                "first_name": first_name,
-                "last_name": last_name
-            }, "$setOnInsert": {"points": 0}},
-            upsert=True
-        )
-
-    async def update_points(self, user_id: int, points: int):
-        """Increments points for a user."""
-        await self.users.update_one(
-            {"user_id": user_id},
-            {"$inc": {"points": points}},
-            upsert=True
-        )
-
-    async def get_leaderboard(self, limit=10):
-        """Returns top users by points."""
-        cursor = self.users.find().sort("points", -1).limit(limit)
-        return await cursor.to_list(length=limit)
-
-    async def track_search(self, movie_name: str):
-        """Track all movie searches for analytics."""
-        # We'll use a separate collection for analytics if needed, or update files.
-        # For simplicity, we'll increment a global search counter per movie name.
-        await self.db.analytics.update_one(
-            {"movie_name": movie_name.lower()},
-            {"$inc": {"total_searches": 1}},
-            upsert=True
-        )
-
-    async def get_top_searches(self, limit=10):
-        """Returns top searched movies."""
-        cursor = self.db.analytics.find().sort("total_searches", -1).limit(limit)
-        return await cursor.to_list(length=limit)
-
-    async def save_request(self, query: str, user_id: int):
-        """Saves a movie request from a user."""
-        await self.requests.insert_one({
-            "query": query,
-            "user_id": user_id,
-            "requested_at": datetime.utcnow()
-        })
-
-    async def get_all_requests(self, limit=50):
-        """Returns all movie requests for admins."""
-        cursor = self.requests.find().sort("requested_at", -1)
-        return await cursor.to_list(length=limit)
-
-    async def delete_all_requests(self):
-        """Clears all requests."""
-        await self.requests.delete_many({})
-
-    async def add_to_history(self, user_id: int, query: str):
-        """Adds a query to the user's search history."""
-        # Store as $push to a list in the user document, keeping last 5
-        await self.users.update_one(
-            {"user_id": user_id},
+            {"telegram_user_id": user.id},
             {
-                "$push": {
-                    "history": {
-                        "$each": [query],
-                        "$slice": -5
-                    }
+                "$set": {
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "username": user.username
+                },
+                "$setOnInsert": {
+                    "points": 0,
+                    "total_searches": 0,
+                    "total_downloads": 0,
+                    "joined_at": datetime.utcnow()
                 }
             },
             upsert=True
         )
 
-    async def get_history(self, user_id: int):
-        """Retrieves search history for a user."""
-        user = await self.users.find_one({"user_id": user_id})
-        return user.get("history", []) if user else []
+    async def update_user_stats(self, user_id: int, points: int = 0, search: bool = False, download: bool = False):
+        """Atomic updates for points and activity metrics."""
+        update = {"$inc": {"points": points}}
+        if search: update["$inc"]["total_searches"] = 1
+        if download: update["$inc"]["total_downloads"] = 1
+        
+        await self.users.update_one({"telegram_user_id": user_id}, update)
 
-    async def get_total_users(self):
-        return await self.users.count_documents({})
+    async def get_user_profile(self, user_id: int):
+        """Fetches complete profile with rank."""
+        user = await self.users.find_one({"telegram_user_id": user_id})
+        if not user: return None
+        
+        # Calculate rank
+        rank = await self.users.count_documents({"points": {"$gt": user.get("points", 0)}}) + 1
+        user["rank"] = rank
+        return user
 
-    async def get_total_files(self):
-        return await self.files.count_documents({})
+    async def get_leaderboard(self, limit=10):
+        """Top users by points."""
+        return await self.users.find().sort("points", -1).limit(limit).to_list(length=limit)
 
-    async def get_total_search_count(self):
-        """Calculates total search count across all analytics."""
-        pipeline = [{"$group": {"_id": None, "total": {"$sum": "$total_searches"}}}]
-        cursor = self.db.analytics.aggregate(pipeline)
-        result = await cursor.to_list(length=1)
-        return result[0]["total"] if result else 0
-
-    async def get_total_points(self):
-        """Calculates total points across all users."""
-        pipeline = [{"$group": {"_id": None, "total": {"$sum": "$points"}}}]
-        cursor = self.users.aggregate(pipeline)
-        result = await cursor.to_list(length=1)
-        return result[0]["total"] if result else 0
-
+    # --- FILE INDEXING ---
     async def save_file(self, file_data):
-        """
-        Saves file data to the database.
-        file_data: {file_id, message_id, movie_name, year, quality, movie_language, movie_key, size}
-        """
-        # Ensure unique index on file_id and quality for the same movie_key
-        existing = await self.files.find_one({
-            "movie_key": file_data["movie_key"],
-            "quality": file_data["quality"]
-        })
-        
-        if existing:
-            return False # Already exists
-        
-        file_data["indexed_at"] = datetime.utcnow()
-        file_data["search_count"] = 0
-        await self.files.insert_one(file_data)
-        return True
+        """Saves file with unique constraint validation."""
+        try:
+            file_data["indexed_at"] = datetime.utcnow()
+            await self.files.insert_one(file_data)
+            return True
+        except Exception: # Duplicate file_unique_id
+            return False
 
-    async def increment_search(self, movie_key: str):
-        """Increments search count for all files of a movie."""
-        await self.files.update_many(
-            {"movie_key": movie_key},
-            {"$inc": {"search_count": 1}}
-        )
-
-    async def get_top_movies(self, limit=10):
-        """Returns top searched movies grouped by movie_key."""
-        pipeline = [
-            {"$group": {
-                "_id": "$movie_key",
-                "movie_name": {"$first": "$movie_name"},
-                "year": {"$first": "$year"},
-                "total_searches": {"$max": "$search_count"}
-            }},
-            {"$sort": {"total_searches": -1}},
-            {"$limit": limit}
-        ]
-        cursor = self.files.aggregate(pipeline)
-        return await cursor.to_list(length=limit)
-
-    async def search_movies(self, query: str):
-        """
-        Search movies by name (case-insensitive partial match).
-        Returns grouped results by movie_key.
-        """
+    async def search_movies(self, query: str, offset=0, limit=10):
+        """Optimized case-insensitive search with pagination."""
         cursor = self.files.find({
             "movie_name": {"$regex": query, "$options": "i"}
-        }).sort("indexed_at", -1)
-        
-        results = await cursor.to_list(length=100)
-        
-        # Group by movie_key
-        grouped = {}
-        for item in results:
-            key = item["movie_key"]
-            if key not in grouped:
-                grouped[key] = {
-                    "movie_name": item["movie_name"],
-                    "year": item["year"],
-                    "files": []
-                }
-            grouped[key]["files"].append({
-                "quality": item["quality"],
-                "language": item["movie_language"],
-                "file_id": item["file_id"],
-                "message_id": item["message_id"],
-                "db_id": str(item["_id"])
-            })
-            
-        return grouped
+        }).sort("indexed_at", -1).skip(offset).limit(limit)
+        return await cursor.to_list(length=limit)
 
-    async def get_file_by_id(self, file_id: str):
-        return await self.files.find_one({"file_id": file_id})
+    async def get_total_files_count(self, query: str = ""):
+        filter_q = {"movie_name": {"$regex": query, "$options": "i"}} if query else {}
+        return await self.files.count_documents(filter_q)
 
-    async def get_file_by_db_id(self, db_id: str):
-        return await self.files.find_one({"_id": ObjectId(db_id)})
+    # --- SEARCH LOGS ---
+    async def track_search(self, query: str):
+        """Numerical tracking of popular queries."""
+        await self.search_logs.update_one(
+            {"query": query.lower().strip()},
+            {"$inc": {"count": 1}},
+            upsert=True
+        )
+
+    async def get_top_searches(self, limit=10):
+        return await self.search_logs.find().sort("count", -1).limit(limit).to_list(length=limit)
+
+    # --- QUIZ SYSTEM ---
+    async def get_active_quiz(self):
+        return await self.quiz.find_one({"active": True})
+
+    async def create_quiz(self, question, answer, options):
+        await self.quiz.update_many({"active": True}, {"$set": {"active": False}})
+        await self.quiz.insert_one({
+            "question": question,
+            "correct_answer": answer,
+            "options": options,
+            "active": True,
+            "answered_by": None,
+            "created_at": datetime.utcnow()
+        })
+
+    async def claim_quiz(self, quiz_id, user_id):
+        """Ensures only the first winner claims the quiz points."""
+        result = await self.quiz.update_one(
+            {"_id": ObjectId(quiz_id), "active": True, "answered_by": None},
+            {"$set": {"answered_by": user_id, "active": False}}
+        )
+        return result.modified_count > 0
+
+    # --- ADMIN ---
+    async def get_total_stats(self):
+        return {
+            "users": await self.users.count_documents({}),
+            "files": await self.files.count_documents({}),
+            "searches": await self.search_logs.count_documents({}),
+            "top_user": await self.users.find_one(sort=[("points", -1)])
+        }
+
+    async def get_all_user_ids(self):
+        cursor = self.users.find({}, {"telegram_user_id": 1})
+        return [u["telegram_user_id"] for u in await cursor.to_list(length=None)]
+
+    async def save_request(self, query: str, user_id: int):
+        await self.requests.insert_one({
+            "query": query, "user_id": user_id, "requested_at": datetime.utcnow()
+        })
 
 db = Database()

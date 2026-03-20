@@ -1,127 +1,93 @@
-def box_text(title, lines):
-    """Creates a modern, responsive card-style UI."""
-    # Header
-    box = f"🎬 <b>{title.upper()}</b>\n"
-    box += f"━━━━━━━━━━━━━━━━━━━━\n"
-    
-    # Content
-    for line in lines:
-        if "───" in line or "━━━" in line: # Divider
-            box += f"────────────────────\n"
-        elif "  " in line:
-            # Handle Label Value alignment with code blocks for responsiveness
-            parts = line.split("  ", 1)
-            label = parts[0].strip()
-            value = parts[1].strip()
-            box += f"<b>{label}:</b> <code>{value}</code>\n"
-        else:
-            box += f"{line}\n"
-    
-    box += f"━━━━━━━━━━━━━━━━━━━━\n"
-    return box
+from datetime import datetime
 
-def format_movie_card(movie_name, year, rating, language):
-    """Creates a modern responsive movie card."""
-    title = f"{movie_name} ({year})" if year else movie_name
-    lines = [
-        f"Rating      {rating}/10",
-        f"Language    {language}",
-        "───",
-        "Available Qualities below"
-    ]
-    return box_text(title, lines)
+def format_movie_card(name, year, rating, language):
+    """Premium Box-Style Movie Card."""
+    return (
+        f"🎬 <b>{name}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🗓️ <b>Year</b>: {year}\n"
+        f"⭐ <b>Rating</b>: {rating}/10\n"
+        f"🌐 <b>Language</b>: {language}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ <i>Fastest Telegram Movie Bot</i>"
+    )
+
+def format_start(users, files, name):
+    """Dynamic Professional Start Message."""
+    return (
+        f"👋 <b>Hello, {name}!</b>\n\n"
+        f"Welcome to the <b>Premium Movie Bot</b> 🎬\n\n"
+        f"🚀 <b>System Live</b>\n"
+        f"👥 Users: {users}+\n"
+        f"📂 Files: {files}+\n\n"
+        f"Search any movie using: `/search movie_name` 🎯"
+    )
+
+def format_profile(p):
+    """Detailed Professional User Profile."""
+    joined = p.get('joined_at', datetime.now()).strftime("%d %b %Y")
+    return (
+        f"👤 <b>USER PROFILE</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏅 <b>Global Rank</b>: #{p.get('rank', 'N/A')}\n"
+        f"💎 <b>Gems</b>: {p.get('points', 0)}\n\n"
+        f"📊 <b>Stats</b>\n"
+        f"🔍 Searches: {p.get('total_searches', 0)}\n"
+        f"📥 Downloads: {p.get('total_downloads', 0)}\n"
+        f"📅 Joined: {joined}\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
 
 def format_leaderboard(users):
-    """Formats the leaderboard into a sleek card."""
-    lines = []
-    for i, user in enumerate(users, 1):
-        name = user.get('first_name', 'User')[:15]
-        gems = user.get('points', 0)
-        lines.append(f"{i}. <b>{name}</b>  {gems} Gems")
-    
-    if not lines: lines = ["No users recorded yet"]
-    return box_text("TOP 10 GEMS", lines)
+    """Premium Leaderboard."""
+    text = "🏆 <b>TOP PERFORMERS</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+    for i, u in enumerate(users, 1):
+        medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "✨"
+        name = u.get('first_name') or "User"
+        text += f"{medal} #{i} | {name} | {u.get('points', 0)} 💎\n"
+    text += "━━━━━━━━━━━━━━━━━━━━"
+    return text
 
 def format_top_searches(searches):
-    """Formats top searches into a sleek card."""
-    lines = []
-    for i, item in enumerate(searches, 1):
-        name = item.get('movie_name', item.get('_id', 'Unknown'))[:15]
-        count = item.get('total_searches', 0)
-        lines.append(f"{i}. <b>{name}</b>  {count}")
-    
-    if not lines: lines = ["No trending searches"]
-    return box_text("TRENDING MOVIES", lines)
+    """Professional Trending Searches."""
+    text = "🔥 <b>TRENDING MOVIES</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+    for i, s in enumerate(searches, 1):
+        text += f"{i}. {s['query'].upper()} ({s['count']} 🔥)\n"
+    text += "━━━━━━━━━━━━━━━━━━━━"
+    return text
 
 def format_quiz(question, options):
-    """Formats the math quiz into a sleek card."""
-    lines = [
-        "Solve the puzzle to win gems!",
-        f"<b>Question:</b> <code>{question} = ?</code>",
-        "───",
-        "<b>Timeout:</b> <code>30 Seconds</code>"
-    ]
-    return box_text("GEMS QUIZ", lines)
-
-def format_start(name, users=0, files=0):
-    """Formats a modern welcome card."""
-    lines = [
-        f"Welcome, <b>{name}</b>!",
-        "───",
-        f"Network     <code>{users}+ Users</code>",
-        f"Library     <code>{files}+ Files</code>",
-        "───",
-        "• High Speed Search",
-        "• Premium Quality",
-        "• Instant Delivery"
-    ]
-    return box_text("MOVIE BOT PRO", lines)
-
-def format_stats(users, files, searches, points, top_user):
-    """Formats a sleek stats card."""
-    lines = [
-        f"Total Users  {users}",
-        f"Total Files  {files}",
-        f"Searches     {searches}",
-        f"Total Gems   {points}",
-        "───",
-        f"Top Member   {top_user}"
-    ]
-    return box_text("SYSTEM STATISTICS", lines)
-
-def format_guide():
-    """Formats a modern guide card."""
-    lines = [
-        "How to use the bot",
-        "───",
-        "<b>Search</b>      <code>/search movie</code>",
-        "<b>Win Gems</b>    <code>Every 20 mins</code>",
-        "<b>Auto-Del</b>    <code>Files (20m)</code>"
-    ]
-    return box_text("BOT GUIDE", lines)
+    return (
+        f"🧩 <b>FLASH QUIZ!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<b>Q: {question}</b>\n\n"
+        f"Options: {', '.join(map(str, options))}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 Reward: <b>+5 Gems</b>"
+    )
 
 def format_help():
-    """Formats a modern help card."""
-    lines = [
-        "Need assistance?",
-        "───",
-        "• Use /search to find movies",
-        "• Click buttons for downloads",
-        "• Win gems for faster access",
-        "───",
-        "Contact @philobots for support"
-    ]
-    return box_text("HELP CENTER", lines)
+    return (
+        f"📖 <b>BOT GUIDE</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔍 `/search` - Find any movie\n"
+        f"👤 `/me` - Check your profile\n"
+        f"🏆 `/leaderboard` - Top users\n"
+        f"🔥 `/top` - Trending movies\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚠️ <i>Join Force Channel for Access</i>"
+    )
 
 def format_about():
-    """Formats a modern about card."""
-    lines = [
-        "System Information",
-        "───",
-        "<b>Version</b>      <code>2.5 Pro</code>",
-        "<b>Framework</b>    <code>Pyrogram v2</code>",
-        "<b>Core</b>         <code>Async Engine</code>",
-        "───",
-        "Developed for peak performance"
-    ]
-    return box_text("ABOUT SYSTEM", lines)
+    return (
+        f"ℹ️ <b>ABOUT BOT</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Build: <b>v4.0 Professional</b>\n"
+        f"Status: <b>Active ⚡</b>\n"
+        f"Database: <b>MongoDB Cloud ☁️</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Developed with ❤️ for the community."
+    )
+
+def format_guide():
+    return format_help()
