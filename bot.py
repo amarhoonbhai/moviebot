@@ -179,8 +179,11 @@ async def search_cmd(client, message: Message):
 
     if not await is_subscribed(client, user_id):
         invite_link = f"https://t.me/{FORCE_SUB_CHANNEL.replace('@', '')}"
-        text = f"⚠️ Access Denied! Join {FORCE_SUB_CHANNEL} to use the bot."
-        btn = [[InlineKeyboardButton("📢 Join Channel", url=invite_link)]]
+        text = f"⚠️ <b>ACCESS DENIED</b>\n━━━━━━━━━━━━━━━━━━━━\nJoin {FORCE_SUB_CHANNEL} to use the search feature and download files.\n━━━━━━━━━━━━━━━━━━━━"
+        btn = [
+            [InlineKeyboardButton("📢 Join Channel", url=invite_link)],
+            [InlineKeyboardButton("✅ Verify Subscription", callback_data=f"verify_sub_{query if 'query' in locals() else ''}")]
+        ]
         return await message.reply_text(text, reply_markup=InlineKeyboardMarkup(btn))
 
     if len(message.command) < 2:
@@ -285,6 +288,21 @@ async def start_ui_callbacks(client, callback: CallbackQuery):
         await callback.message.edit_text(format_top_searches(searches), reply_markup=callback.message.reply_markup)
     
     await callback.answer()
+
+@bot.on_callback_query(filters.regex(r'^verify_sub_'))
+async def verify_sub_handler(client, callback: CallbackQuery):
+    """Re-checks subscription status."""
+    user_id = callback.from_user.id
+    if await is_subscribed(client, user_id):
+        await callback.answer("✅ Success! You are now verified.", show_alert=True)
+        await callback.message.delete()
+        # Optionally re-trigger search if query was passed
+        query = callback.data.replace("verify_sub_", "")
+        if query:
+            # We can't easily re-trigger the message handler, but we can tell them to search again
+            await callback.message.reply_text(f"✅ Verified! Please send your search again: <code>/search {query}</code>")
+    else:
+        await callback.answer("❌ Still not joined! Please join the channel first.", show_alert=True)
 
 # --- ADMIN ---
 

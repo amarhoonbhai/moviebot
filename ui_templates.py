@@ -1,134 +1,127 @@
 def box_text(title, lines):
-    """Creates a professional fixed-width box UI (30 chars)."""
-    width = 30
+    """Creates a modern, responsive card-style UI."""
     # Header
-    box = f"┌{'─' * width}\n"
-    box += f"│ <b>{title.upper()}</b>\n"
-    box += f"├{'─' * width}\n"
+    box = f"🎬 <b>{title.upper()}</b>\n"
+    box += f"━━━━━━━━━━━━━━━━━━━━\n"
     
     # Content
     for line in lines:
-        if "───" in line: # Decorative divider
-            box += f"├{'─' * width}\n"
+        if "───" in line or "━━━" in line: # Divider
+            box += f"────────────────────\n"
+        elif "  " in line:
+            # Handle Label Value alignment with code blocks for responsiveness
+            parts = line.split("  ", 1)
+            label = parts[0].strip()
+            value = parts[1].strip()
+            box += f"<b>{label}:</b> <code>{value}</code>\n"
         else:
-            # Handle Label Value alignment (fixed 12 char label width)
-            if "  " in line:
-                parts = line.split("  ", 1)
-                label = parts[0].strip()
-                value = parts[1].strip()
-                padding = max(0, 12 - len(label))
-                box += f"│ {label}{' ' * padding} {value}\n"
-            else:
-                box += f"│ {line}\n"
+            box += f"{line}\n"
     
-    box += f"└{'─' * width}\n"
+    box += f"━━━━━━━━━━━━━━━━━━━━\n"
     return box
 
 def format_movie_card(movie_name, year, rating, language):
-    """Creates a premium movie card matching the new style."""
+    """Creates a modern responsive movie card."""
     title = f"{movie_name} ({year})" if year else movie_name
     lines = [
         f"Rating      {rating}/10",
         f"Language    {language}",
         "───",
-        "Formats"
+        "Available Qualities below"
     ]
-    card = box_text(title, lines)
-    card += "\n➠ Select quality"
-    return card
+    return box_text(title, lines)
 
 def format_leaderboard(users):
-    """Formats the leaderboard into a clean box UI with Gems."""
+    """Formats the leaderboard into a sleek card."""
     lines = []
     for i, user in enumerate(users, 1):
-        name = user.get('first_name', 'User')[:12]
+        name = user.get('first_name', 'User')[:15]
         gems = user.get('points', 0)
-        lines.append(f"{i}. {name}  {gems} Gems")
+        lines.append(f"{i}. <b>{name}</b>  {gems} Gems")
     
-    if not lines: lines = ["No users yet"]
+    if not lines: lines = ["No users recorded yet"]
     return box_text("TOP 10 GEMS", lines)
 
 def format_top_searches(searches):
-    """Formats top searches into a clean box UI."""
+    """Formats top searches into a sleek card."""
     lines = []
     for i, item in enumerate(searches, 1):
         name = item.get('movie_name', item.get('_id', 'Unknown'))[:15]
         count = item.get('total_searches', 0)
-        lines.append(f"{i}. {name}  {count}")
+        lines.append(f"{i}. <b>{name}</b>  {count}")
     
-    if not lines: lines = ["No searches yet"]
-    return box_text("TRENDING NOW", lines)
+    if not lines: lines = ["No trending searches"]
+    return box_text("TRENDING MOVIES", lines)
 
 def format_quiz(question, options):
-    """Formats the math quiz into a clean box UI."""
+    """Formats the math quiz into a sleek card."""
     lines = [
-        "Solve this puzzle",
-        f"<b>{question} = ?</b>",
+        "Solve the puzzle to win gems!",
+        f"<b>Question:</b> <code>{question} = ?</code>",
         "───",
-        "Timeout     30 sec"
+        "<b>Timeout:</b> <code>30 Seconds</code>"
     ]
-    box = box_text("GEMS QUIZ", lines)
-    box += "\n➠ Select one option"
-    return box
+    return box_text("GEMS QUIZ", lines)
 
 def format_start(name, users=0, files=0):
-    """Formats the enhanced start welcome panel."""
+    """Formats a modern welcome card."""
     lines = [
-        f"Welcome, {name}!",
+        f"Welcome, <b>{name}</b>!",
         "───",
-        f"Files       {files}+",
-        f"Users       {users}+",
+        f"Network     <code>{users}+ Users</code>",
+        f"Library     <code>{files}+ Files</code>",
         "───",
-        "Fast movie search",
-        "High quality files",
-        "Instant delivery"
+        "• High Speed Search",
+        "• Premium Quality",
+        "• Instant Delivery"
     ]
-    box = box_text("MOVIE BOT", lines)
-    box += "\n➠ Use /search movie name"
-    return box
+    return box_text("MOVIE BOT PRO", lines)
 
 def format_stats(users, files, searches, points, top_user):
-    """Formats the enhanced stats message."""
+    """Formats a sleek stats card."""
     lines = [
-        f"Users       {users}",
-        f"Files       {files}",
-        f"Searches    {searches}",
-        f"Total Gems  {points}",
+        f"Total Users  {users}",
+        f"Total Files  {files}",
+        f"Searches     {searches}",
+        f"Total Gems   {points}",
         "───",
-        f"Top User    {top_user}"
+        f"Top Member   {top_user}"
     ]
-    return box_text("BOT STATISTICS", lines)
+    return box_text("SYSTEM STATISTICS", lines)
 
 def format_guide():
-    """Formats the guide command message."""
+    """Formats a modern guide card."""
     lines = [
-        "Search      /search movie",
-        "Gems        Win in quizzes",
-        "Quiz        Every 20 mins",
-        "Limits      20 min auto-del"
+        "How to use the bot",
+        "───",
+        "<b>Search</b>      <code>/search movie</code>",
+        "<b>Win Gems</b>    <code>Every 20 mins</code>",
+        "<b>Auto-Del</b>    <code>Files (20m)</code>"
     ]
     return box_text("BOT GUIDE", lines)
 
 def format_help():
-    """Formats the help command message."""
+    """Formats a modern help card."""
     lines = [
-        "Search      Movie keywords",
-        "Download    Select quality",
-        "Leaderboard Track gems",
-        "Support     Contact admin",
+        "Need assistance?",
         "───",
-        "Use buttons below for links"
+        "• Use /search to find movies",
+        "• Click buttons for downloads",
+        "• Win gems for faster access",
+        "───",
+        "Contact @philobots for support"
     ]
     return box_text("HELP CENTER", lines)
 
 def format_about():
-    """Formats the about command message."""
+    """Formats a modern about card."""
     lines = [
-        "Version     2.0 Pro",
-        "Developer   @Antigravity",
-        "Framework   Pyrogram",
-        "Database    MongoDB",
+        "System Information",
         "───",
-        "The most advanced movie bot"
+        "<b>Version</b>      <code>2.5 Pro</code>",
+        "<b>Framework</b>    <code>Pyrogram v2</code>",
+        "<b>Core</b>         <code>Async Engine</code>",
+        "───",
+        "Developed for peak performance"
     ]
-    return box_text("ABOUT BOT", lines)
+    return box_text("ABOUT SYSTEM", lines)
