@@ -211,6 +211,10 @@ async def index_handler(client, message: Message):
             "file_size": message.document.file_size
         })
         await db.save_file(data)
+        try:
+            await message.reply_text(f"✅ <b>{data['movie_name']}</b> successfully indexed into the database!", quote=True)
+        except Exception as e:
+            logger.error(f"Reply fail: {e}")
     else:
         logger.warning(f"⚠️ PARSE FAIL: Could not extract data from '{text}'")
 
