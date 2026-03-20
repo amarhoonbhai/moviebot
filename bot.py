@@ -5,7 +5,6 @@ from parser import parse_movie_data
 from database import db
 from tmdb_helper import get_movie_details
 from ui_templates import format_movie_card, format_quiz, format_start, format_guide, format_help, format_about, format_profile, format_leaderboard, format_top_searches, format_stats
-from profile_card import generate_profile_card, generate_leaderboard_card, generate_top_searches_card, generate_stats_card
 import logging
 import asyncio
 import os
@@ -98,58 +97,19 @@ async def me_cmd(client, message: Message):
     profile = await db.get_user_profile(message.from_user.id)
     if not profile: return
     
-    load_msg = await show_loading(message)
-    
-    avatar_path = f"avatar_{message.from_user.id}.jpg"
-    final_avatar = None
-    try:
-        photos = [p async for p in client.get_chat_photos(message.from_user.id, limit=1)]
-        if photos:
-            final_avatar = await client.download_media(photos[0].file_id, file_name=avatar_path)
-    except: pass
-
-    try:
-        chat = await client.get_chat(message.from_user.id)
-        bio = chat.bio or "No bio provided."
-    except Exception:
-        bio = "No bio provided."
-
     first_name = message.from_user.first_name or ""
     last_name = message.from_user.last_name or ""
     full_name = f"{first_name} {last_name}".strip() or "Unknown"
     
-    username = message.from_user.username or "Unknown"
-    user_id = message.from_user.id
-
-    rank = profile.get('rank', 'N/A')
-    gems = profile.get('points', 0)
-    searches = profile.get('total_searches', 0)
-    downloads = profile.get('total_downloads', 0)
-    joined = profile.get('joined_at', datetime.now()).strftime("%d %b %Y")
-    
-    path = generate_profile_card(full_name, username, user_id, bio, rank, gems, searches, downloads, joined, avatar_path=final_avatar)
-    
     caption_text = format_profile(full_name, profile)
-    try:
-        await message.reply_photo(photo=path, caption=caption_text, reply_markup=get_nav_markup())
-        await load_msg.delete()
-    finally:
-        if os.path.exists(path): os.remove(path)
-        if final_avatar and os.path.exists(final_avatar): os.remove(final_avatar)
+    await message.reply_text(caption_text, reply_markup=get_nav_markup())
 
 @bot.on_message(filters.command("leaderboard") & (filters.private | filters.group))
 @handle_errors
 async def lb_cmd(client, message: Message):
-    load_msg = await message.reply_text("Loading Leaderboard...")
     users = await db.get_leaderboard()
     caption_text = format_leaderboard(users)
-    try:
-        path = generate_leaderboard_card(users)
-        await message.reply_photo(photo=path, caption=caption_text, reply_markup=get_nav_markup())
-        if os.path.exists(path): os.remove(path)
-    except Exception as e:
-        logger.error(f"Image Error: {e}")
-    await load_msg.delete()
+    await message.reply_text(caption_text, reply_markup=get_nav_markup())
 
 @bot.on_message(filters.command("id") & (filters.private | filters.group))
 @handle_errors
@@ -168,16 +128,9 @@ async def id_cmd(client, message: Message):
 @bot.on_message(filters.command("top") & (filters.private | filters.group))
 @handle_errors
 async def top_cmd(client, message: Message):
-    load_msg = await message.reply_text("Loading Trending...")
     searches = await db.get_top_searches()
     caption_text = format_top_searches(searches)
-    try:
-        path = generate_top_searches_card(searches)
-        await message.reply_photo(photo=path, caption=caption_text, reply_markup=get_nav_markup())
-        if os.path.exists(path): os.remove(path)
-    except Exception as e:
-        logger.error(f"Image Error: {e}")
-    await load_msg.delete()
+    await message.reply_text(caption_text, reply_markup=get_nav_markup())
 
 @bot.on_message(filters.command("search") & (filters.private | filters.group))
 @handle_errors
@@ -347,59 +300,14 @@ async def qz_handler(client, callback: CallbackQuery):
             await callback.message.edit_text(f"🏆 {callback.from_user.first_name} won the quiz!\nAnswer: {ans}")
     else: await callback.answer("❌ Wrong!", show_alert=True)
 
-@bot.on_callback_query(filters.regex('gen_card'))
-@handle_errors
-async def gen_card_handler(client, callback: CallbackQuery):
-    profile = await db.get_user_profile(callback.from_user.id)
-    if not profile: return await callback.answer("❌ Profile not found.")
-    
-    await callback.answer("🎨 Generating your card...")
-    
-    # Download Avatar
-    avatar_path = f"avatar_{callback.from_user.id}.jpg"
-    final_avatar = None
-    try:
-        photos = [p async for p in client.get_chat_photos(callback.from_user.id, limit=1)]
-        if photos:
-            final_avatar = await client.download_media(photos[0].file_id, file_name=avatar_path)
-    except: pass
-
-    # Data for the card
-    name = callback.from_user.first_name
-    rank = profile.get('rank', 'N/A')
-    gems = profile.get('points', 0)
-    searches = profile.get('total_searches', 0)
-    downloads = profile.get('total_downloads', 0)
-    joined = profile.get('joined_at', datetime.now()).strftime("%d %b %Y")
-    
-    # Generate
-    path = generate_profile_card(name, rank, gems, searches, downloads, joined, avatar_path=final_avatar)
-    
-    try:
-        await callback.message.reply_photo(
-            photo=path,
-            caption=f"✨ <b>{name}'s Premium Stats Card</b>\n────────────────────\n➲ <i>Generated by Pro Movie Bot v4.5</i>"
-        )
-        await callback.message.delete()
-    finally:
-        if os.path.exists(path): os.remove(path)
-        if final_avatar and os.path.exists(final_avatar): os.remove(final_avatar)
-
 # --- ADMIN ---
 
 @bot.on_message(filters.command("stats") & (filters.private | filters.group))
 @handle_errors
 async def stats_cmd(client, message: Message):
-    load_msg = await message.reply_text("Loading Stats...")
     s = await db.get_total_stats()
     caption_text = format_stats(s)
-    try:
-        path = generate_stats_card(s)
-        await message.reply_photo(photo=path, caption=caption_text, reply_markup=get_nav_markup())
-        if os.path.exists(path): os.remove(path)
-    except Exception as e:
-        logger.error(f"Image Error: {e}")
-    await load_msg.delete()
+    await message.reply_text(caption_text, reply_markup=get_nav_markup())
 
 @bot.on_message(filters.command("ping") & (filters.private | filters.group))
 @handle_errors
