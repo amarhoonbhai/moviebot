@@ -1,4 +1,4 @@
-from pyrogram import Client, filters, enums
+from pyrogram import Client, filters, enums, idle
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, BotCommand
 from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, FORCE_SUB_CHANNEL, TMDB_API_KEY, SUPPORT_CHANNEL, GC_LINK, GROUP_ID
 from parser import parse_movie_data
@@ -280,6 +280,8 @@ async def main():
     scheduler.add_job(send_quiz, "interval", minutes=20)
     scheduler.start()
     logger.info("PRO-BACKEND ACTIVE 🚀")
+    await idle()
+    await bot.stop()
 
 if __name__ == "__main__":
     bot.run(main())
