@@ -7,7 +7,6 @@ from tmdb_helper import get_movie_details
 from ui_templates import format_movie_card, format_quiz, format_start, format_guide, format_help, format_about, format_profile, format_leaderboard, format_top_searches, format_stats
 import logging
 import asyncio
-import os
 import random
 from datetime import datetime, time
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
