@@ -152,6 +152,33 @@ async def search_cmd(client, message: Message):
     except Exception:
         await load_msg.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
 
+# --- INDEXER ---
+
+@bot.on_message(filters.chat(CHANNEL_ID) & filters.document)
+async def index_handler(client, message: Message):
+    """Professional Auto-Indexing System."""
+    if not message.document: return
+    
+    file_unique_id = message.document.file_unique_id
+    if not file_unique_id:
+        logger.error(f"❌ INDEX SKIP: Missing file_unique_id in msg {message.id}")
+        return
+
+    # Use caption if available, otherwise filename
+    text = message.caption or message.document.file_name
+    data = parse_movie_data(text)
+    
+    if data:
+        data.update({
+            "file_id": message.document.file_id,
+            "file_unique_id": file_unique_id,
+            "message_id": message.id,
+            "file_size": message.document.file_size
+        })
+        await db.save_file(data)
+    else:
+        logger.warning(f"⚠️ PARSE FAIL: Could not extract data from '{text}'")
+
 # --- CALLBACKS ---
 
 @bot.on_callback_query(filters.regex(r'^dl_'))

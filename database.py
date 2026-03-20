@@ -21,17 +21,19 @@ class Database:
     async def fix_indexes(self):
         """Ultra-Professional Index Cleanup & Initialization."""
         try:
-            # 1. Sanitize Data: Remove any document with null/missing telegram_user_id
+            # 1. Sanitize Data: Remove any document with null/missing critical IDs
             await self.users.delete_many({"telegram_user_id": None})
+            await self.files.delete_many({"file_unique_id": None})
             
-            # 2. Nuclear Cleanup: Drop all non-primary indexes on users
-            indexes = await self.users.index_information()
-            for idx_name in list(indexes.keys()):
-                if idx_name != "_id_":
-                    try:
-                        await self.users.drop_index(idx_name)
-                        logger.info(f"Dropped legacy index: {idx_name}")
-                    except Exception: pass
+            # 2. Nuclear Cleanup: Drop all non-primary indexes
+            for coll in [self.users, self.files, self.search_logs]:
+                indexes = await coll.index_information()
+                for idx_name in list(indexes.keys()):
+                    if idx_name != "_id_":
+                        try:
+                            await coll.drop_index(idx_name)
+                            logger.info(f"Dropped legacy index from {coll.name}: {idx_name}")
+                        except Exception: pass
             
             # 3. Apply Professional Unique Indexes
             await self.users.create_index("telegram_user_id", unique=True)
@@ -87,14 +89,27 @@ class Database:
         """Top users by points."""
         return await self.users.find().sort("points", -1).limit(limit).to_list(length=limit)
 
-    # --- FILE INDEXING ---
     async def save_file(self, file_data):
-        """Saves file with unique constraint validation."""
+        """Ultra-Stable Atomic File Save (Upsert)."""
+        file_unique_id = file_data.get("file_unique_id")
+        if not file_unique_id:
+            logger.error("Skipping file save: missing file_unique_id")
+            return False
+            
         try:
             file_data["indexed_at"] = datetime.utcnow()
-            await self.files.insert_one(file_data)
+            result = await self.files.update_one(
+                {"file_unique_id": file_unique_id},
+                {"$setOnInsert": file_data},
+                upsert=True
+            )
+            if result.upserted_id:
+                logger.info(f"Successfully indexed: {file_data.get('movie_name', 'Unknown')}")
+            else:
+                logger.info(f"Duplicate avoided: {file_data.get('movie_name', 'Unknown')}")
             return True
-        except Exception: # Duplicate file_unique_id
+        except Exception as e:
+            logger.error(f"Error saving file: {e}")
             return False
 
     async def search_movies(self, query: str, offset=0, limit=10):
