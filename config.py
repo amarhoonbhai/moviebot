@@ -14,3 +14,5 @@ ADMIN_IDS = [int(i.strip()) for i in os.environ.get("ADMIN_IDS", "5459345700").s
 # Force Subscription Channel
 FORCE_SUB_CHANNEL = os.environ.get("FORCE_SUB_CHANNEL", "@philobots")
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
+SUPPORT_CHANNEL = os.environ.get("SUPPORT_CHANNEL", "https://t.me/philobots")
+GC_LINK = os.environ.get("GC_LINK", "https://t.me/Waifu_Grabber_Bots")

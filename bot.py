@@ -1,10 +1,10 @@
 from pyrogram import Client, filters, enums
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, FORCE_SUB_CHANNEL, TMDB_API_KEY
+from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, FORCE_SUB_CHANNEL, TMDB_API_KEY, SUPPORT_CHANNEL, GC_LINK
 from parser import parse_movie_data
 from database import db
 from tmdb_helper import get_movie_details
-from ui_templates import format_movie_card, format_leaderboard, format_quiz, format_start, format_guide, format_top_searches, format_stats
+from ui_templates import format_movie_card, format_leaderboard, format_quiz, format_start, format_guide, format_top_searches, format_stats, format_help, format_about
 import logging
 import asyncio
 import random
@@ -40,11 +40,11 @@ def is_night_mode():
     now = datetime.now().time()
     return time(0, 0) <= now <= time(6, 0)
 
-async def show_loading_animation(message: Message):
+async def show_loading_animation(message: Message) -> Message:
     """Shows a 3-second loading animation."""
     frames = ["🎬 Loading", "🎬 Loading.", "🎬 Loading..", "🎬 Loading..."]
     load_msg = await message.reply_text(frames[0])
-    for _ in range(2): # 2 cycles approx 3 seconds
+    for _ in range(2):
         for frame in frames:
             await asyncio.sleep(0.4)
             try:
@@ -70,26 +70,20 @@ async def is_subscribed(client, user_id):
 @bot.on_message(filters.chat(CHANNEL_ID) & (filters.video | filters.document))
 async def auto_index_channel(client: Client, message: Message):
     """Handler for auto-indexing files with auto-rename."""
-    # Check if message has media
     media = message.video or message.document
     if not media: return
 
-    # Priority: Caption > Filename
     text_to_parse = message.caption or media.file_name or "Unknown Movie"
     data = parse_movie_data(text_to_parse)
     if not data: return
 
-    # CLEAN FILENAME: MOVIE TITLE (YEAR) QUALITY.EXT
     ext = media.file_name.split('.')[-1] if media.file_name else "mkv"
     year_str = f"({data['year']})" if data['year'] else ""
     clean_name = f"{data['movie_name'].upper()} {year_str} {data['quality']}.{ext}".replace("  ", " ")
 
-    # Check if rename is needed
     if media.file_name != clean_name:
         logger.info(f"Renaming: {media.file_name} -> {clean_name}")
-        # Download
         path = await message.download(file_name=clean_name)
-        # Re-upload to the same channel
         caption = f"✅ Auto-Renamed\n🎬 **{data['movie_name']}**"
         try:
             if message.video:
@@ -97,10 +91,8 @@ async def auto_index_channel(client: Client, message: Message):
             else:
                 new_msg = await client.send_document(CHANNEL_ID, document=path, caption=caption, file_name=clean_name)
             
-            # Use new media for indexing
             media = new_msg.video or new_msg.document
             msg_id = new_msg.id
-            # Delete old message to keep channel clean
             await message.delete()
         finally:
             import os
@@ -122,36 +114,52 @@ async def auto_index_channel(client: Client, message: Message):
 
     if await db.save_file(file_info):
         logger.info(f"Indexed: {data['movie_name']}")
+
 @bot.on_message(filters.command("start") & filters.private)
 async def start_cmd(client, message: Message):
     if is_night_mode():
         return await message.reply_text("🌙 Night mode active. Limited features available.")
     
-    await db.add_user(message.from_user.id, message.from_user.first_name, message.from_user.last_name)
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name or "User"
+    last_name = message.from_user.last_name or ""
+    
+    await db.add_user(user_id, first_name, last_name)
     
     users = await db.get_total_users()
     files = await db.get_total_files()
-    name = message.from_user.first_name
     
     buttons = [
         [
-            InlineKeyboardButton("🔍 🔴 Search Movie", switch_inline_query_current_chat=""),
-            InlineKeyboardButton("🏆 🟡 Leaderboard", callback_data="show_lb")
+            InlineKeyboardButton("Search Movie", switch_inline_query_current_chat=""),
+            InlineKeyboardButton("Leaderboard", callback_data="show_lb")
         ],
         [
-            InlineKeyboardButton("❓ 🟢 Help Guide", callback_data="show_guide"),
-            InlineKeyboardButton("📊 🔵 Analytics", callback_data="show_top")
+            InlineKeyboardButton("Help Center", callback_data="show_help"),
+            InlineKeyboardButton("About Bot", callback_data="show_about")
+        ],
+        [
+            InlineKeyboardButton("Support Channel", url=SUPPORT_CHANNEL),
+            InlineKeyboardButton("Group Chat", url=GC_LINK)
         ]
     ]
     
     await message.reply_text(
-        format_start(name, users, files),
+        format_start(first_name, users, files),
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
 @bot.on_message(filters.command("guide") & filters.private)
 async def guide_cmd(client, message: Message):
     await message.reply_text(format_guide())
+
+@bot.on_message(filters.command("help") & filters.private)
+async def help_cmd(client, message: Message):
+    await message.reply_text(format_help())
+
+@bot.on_message(filters.command("about") & filters.private)
+async def about_cmd(client, message: Message):
+    await message.reply_text(format_about())
 
 @bot.on_message(filters.command("leaderboard") & (filters.private | filters.group))
 async def leaderboard_cmd(client, message: Message):
@@ -180,9 +188,8 @@ async def search_cmd(client, message: Message):
 
     query = " ".join(message.command[1:])
     await db.track_search(query)
-    await db.update_points(user_id, 1) # +1 Point for search
+    await db.update_points(user_id, 1) # +1 Gem for search
 
-    # Show loading animation
     load_msg = await show_loading_animation(message)
     
     results = await db.search_movies(query)
@@ -191,13 +198,11 @@ async def search_cmd(client, message: Message):
         await load_msg.edit_text("😔 Movie not found! Request added.")
         return
 
-    # Fetch metadata (TMDB)
     first_key = list(results.keys())[0]
     metadata = await get_movie_details(results[first_key]['movie_name'], results[first_key]['year'])
     
-    # Poster Flow
     data = results[first_key]
-    movie_name = metadata['title'] if metadata else data['movie_name']
+    movie_name = metadata['title'].upper() if metadata else data['movie_name'].upper()
     year = metadata['year'] if metadata else data['year']
     rating = metadata['rating'] if metadata else "7.5"
     language = data["files"][0]["language"]
@@ -206,10 +211,10 @@ async def search_cmd(client, message: Message):
     
     buttons = []
     row = []
-    colors = ["🔴", "🟡", "🟢", "🔵", "🟣"]
-    for i, file in enumerate(data["files"]):
-        color = colors[i % len(colors)]
-        row.append(InlineKeyboardButton(f"{color} [{file['quality']}]", callback_data=f"dl_{file['db_id']}"))
+    for file in data["files"]:
+        quality = file.get('quality') or "Download"
+        if not quality or quality.lower() == "unknown": quality = "Download"
+        row.append(InlineKeyboardButton(quality, callback_data=f"dl_{file['db_id']}"))
         if len(row) == 2:
             buttons.append(row)
             row = []
@@ -227,13 +232,12 @@ async def search_cmd(client, message: Message):
 
 @bot.on_callback_query(filters.regex(r'^dl_'))
 async def download_handler(client, callback: CallbackQuery):
-    """Handles quality selection and file delivery."""
     db_id = callback.data.split("_")[1]
     file_data = await db.get_file_by_db_id(db_id)
     if not file_data: return await callback.answer("❌ File not found.")
 
     await callback.answer("Sending file... 🚀")
-    await db.update_points(callback.from_user.id, 2) # +2 Points for download
+    await db.update_points(callback.from_user.id, 2) # +2 Gems for download
 
     caption = f"🎬 **{file_data['movie_name']}**\n➠ Quality: {file_data['quality']}\n\n⚠️ Auto-delete in 20 min."
     try:
@@ -250,7 +254,6 @@ async def download_handler(client, callback: CallbackQuery):
 
 @bot.on_callback_query(filters.regex(r'^qz_'))
 async def quiz_answer_handler(client, callback: CallbackQuery):
-    """Handles quiz answer selection."""
     global CURRENT_QUIZ
     if not CURRENT_QUIZ or CURRENT_QUIZ.get("answered"):
         return await callback.answer("❌ Quiz ended or already won.")
@@ -258,15 +261,14 @@ async def quiz_answer_handler(client, callback: CallbackQuery):
     ans = int(callback.data.split("_")[1])
     if ans == CURRENT_QUIZ["answer"]:
         CURRENT_QUIZ["answered"] = True
-        await db.update_points(callback.from_user.id, 5) # +5 Points for quiz
-        await callback.answer("✅ Correct! +5 Points added.", show_alert=True)
+        await db.update_points(callback.from_user.id, 5) # +5 Gems for quiz
+        await callback.answer("✅ Correct! +5 Gems added.", show_alert=True)
         await callback.message.edit_text(f"🏆 {callback.from_user.first_name} won the quiz!\nAnswer: {ans}")
     else:
         await callback.answer("❌ Wrong answer! Try again.", show_alert=True)
 
 @bot.on_callback_query(filters.regex(r'^show_'))
 async def start_ui_callbacks(client, callback: CallbackQuery):
-    """Handles callbacks from the enhanced start UI."""
     data = callback.data.split("_")[1]
     
     if data == "lb":
@@ -274,6 +276,10 @@ async def start_ui_callbacks(client, callback: CallbackQuery):
         await callback.message.edit_text(format_leaderboard(users), reply_markup=callback.message.reply_markup)
     elif data == "guide":
         await callback.message.edit_text(format_guide(), reply_markup=callback.message.reply_markup)
+    elif data == "help":
+        await callback.message.edit_text(format_help(), reply_markup=callback.message.reply_markup)
+    elif data == "about":
+        await callback.message.edit_text(format_about(), reply_markup=callback.message.reply_markup)
     elif data == "top":
         searches = await db.get_top_searches()
         await callback.message.edit_text(format_top_searches(searches), reply_markup=callback.message.reply_markup)
@@ -291,7 +297,7 @@ async def stats_cmd(client, message: Message):
     
     lb = await db.get_leaderboard(limit=1)
     top_user_data = lb[0] if lb else {}
-    top_user = f"{top_user_data.get('first_name', 'User')} ({top_user_data.get('points', 0)} pts)" if lb else "None"
+    top_user = f"{top_user_data.get('first_name', 'User')} ({top_user_data.get('points', 0)} gems)" if lb else "None"
     
     await message.reply_text(format_stats(users, files, searches, points, top_user))
 
@@ -309,7 +315,7 @@ async def broadcast_cmd(client, message: Message):
 # --- SCHEDULER ---
 
 async def send_math_quiz():
-    """Sends a math quiz message."""
+    """Sends a math quiz message with 30s timeout."""
     if is_night_mode(): return
     
     n1 = random.randint(1, 100)
@@ -320,41 +326,33 @@ async def send_math_quiz():
     random.shuffle(options)
     
     global CURRENT_QUIZ
-    CURRENT_QUIZ = {"answer": answer, "answered": False}
     
     text = format_quiz(f"{n1} + {n2}", options)
-    buttons = []
-    row = []
-    for opt in options:
-        row.append(InlineKeyboardButton(str(opt), callback_data=f"qz_{opt}"))
-        if len(row) == 2:
-            buttons.append(row)
-            row = []
-    if row: buttons.append(row)
+    buttons = [[InlineKeyboardButton(str(opt), callback_data=f"qz_{opt}") for opt in options]]
     
-    # If we had a QUIZ_CHAT_ID, we'd send it there. 
-    # Since we don't, we'll log it and wait for users in groups to interact with other commands?
-    # Actually, for a production bot, the quiz usually appears in a specific group.
-    # I'll use the CHANNEL_ID as a placeholder or just log it if no group is targetted.
-    logger.info(f"New Quiz: {n1} + {n2} = {answer}")
+    msg = await bot.send_message(CHANNEL_ID, text, reply_markup=InlineKeyboardMarkup(buttons))
+    CURRENT_QUIZ = {"answer": answer, "answered": False, "message_id": msg.id}
+    
+    await asyncio.sleep(30)
+    if not CURRENT_QUIZ.get("answered"):
+        try:
+            await msg.delete()
+        except: pass
+    CURRENT_QUIZ = {}
 
 # --- STARTUP ---
 
 async def main():
-    # We need to ensure the bot is started before the scheduler runs
     if not bot.is_connected:
         await bot.start()
     
     logger.info("Bot started!")
     
-    # Add quiz job
-    scheduler.add_job(send_math_quiz, "interval", minutes=30)
+    scheduler.add_job(send_math_quiz, "interval", minutes=20)
     scheduler.start()
     
-    # Keep running
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    # Run the bot
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
