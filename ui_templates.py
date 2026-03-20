@@ -1,111 +1,129 @@
 from datetime import datetime
 
 def format_movie_card(name, year, rating, language):
-    """Premium Professional Movie Card."""
     return (
         f"🎬 <b>{name}</b>\n"
-        f"────────────────────\n"
-        f"⮩ 🗓️ <b>Year</b>: <code>{year}</code>\n"
-        f"⮩ ⭐ <b>Rating</b>: <code>{rating}/10</code>\n"
-        f"⮩ 🌐 <b>Language</b>: <code>{language}</code>\n"
-        f"────────────────────\n"
-        f"➲ <i>Powered by Premium Movie Engine</i>"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"▸ Year       : <code>{year}</code>\n"
+        f"▸ Rating     : <code>{rating}/10</code>\n"
+        f"▸ Language   : <code>{language}</code>\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"➠ Select a file below to download"
     )
 
 def format_start(users, files, name):
-    """Dynamic Professional Start Message."""
     return (
-        f"👋 <b>Welcome back, {name}!</b>\n\n"
-        f"Experience the most advanced <b>Movie Search Engine</b> on Telegram. 🎬\n\n"
-        f"➲ <b>SYSTEM STATUS</b>\n"
-        f"🔹 <b>Verified Users</b>: <code>{users}+</code>\n"
-        f"🔸 <b>Indexed Files</b>: <code>{files}+</code>\n\n"
-        f"➤ <i>Use /help to explore all features.</i>"
+        f"✨ <b>Welcome back, {name}!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"▸ Status      : Online 🟢\n"
+        f"▸ Users       : {users}+\n"
+        f"▸ Files       : {files}+\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"➠ Use the menu below to navigate"
     )
 
-def format_profile(p):
-    """Detailed Professional User Profile."""
-    joined = p.get('joined_at', datetime.now()).strftime("%d %b %Y")
+def get_rank_level(points):
+    if points >= 100: return "Legend"
+    if points >= 50: return "Elite"
+    if points >= 10: return "Pro"
+    return "Beginner"
+
+def format_profile(name, p):
     points = p.get('points', 0)
+    searches = p.get('total_searches', 0)
+    downloads = p.get('total_downloads', 0)
+    rank_str = f"#{p.get('rank', 'N/A')}"
+    level = get_rank_level(points)
     
-    # Progress Bar
-    level_progress = (points % 100) // 10
-    bar = "▰" * level_progress + "▱" * (10 - level_progress)
-
-    # Professional Progress Bar (The "Line")
-    level_progress = (points % 100) // 5
-    bar = "█" * level_progress + "░" * (20 - level_progress)
-
     return (
-        f"👤 <b>USER DASHBOARD</b>\n"
-        f"────────────────────\n"
-        f"🆔 <b>User ID</b>: <code>{p.get('telegram_user_id', 'N/A')}</code>\n"
-        f"🏆 <b>Global Rank</b>: <code>#{p.get('rank', 'N/A')}</code>\n"
-        f"💎 <b>Total Gems</b>: <code>{points}</code>\n\n"
-        f"📈 <b>LEVEL PROGRESS</b>\n"
-        f"<code>{bar}</code>\n\n"
-        f"➲ <b>ACTIVITY STATS</b>\n"
-        f"⮩ Searches: <code>{p.get('total_searches', 0)}</code>\n"
-        f"⮩ Downloads: <code>{p.get('total_downloads', 0)}</code>\n\n"
-        f"📅 <b>Membership</b>: <code>{joined}</code>\n"
-        f"────────────────────"
+        f"✨ <b>{name}'s Profile</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"▸ Rank        : {rank_str}\n"
+        f"▸ Level       : {level} User\n"
+        f"▸ Activity    : Active\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"▸ Gems        : {points}\n"
+        f"▸ Searches    : {searches}\n"
+        f"▸ Downloads   : {downloads}\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"➠ Keep searching to climb leaderboard"
     )
 
 def format_leaderboard(users):
-    """Premium Leaderboard."""
-    text = "🏆 <b>TOP PERFORMERS</b>\n────────────────────\n"
-    for i, u in enumerate(users, 1):
-        medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "🔹"
-        name = u.get('first_name') or "User"
-        text += f"{medal} #{i} | {name} | {u.get('points', 0)} 💎\n"
-    text += "────────────────────"
+    text = (
+        f"🏆 <b>Top Players</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+    )
+    for i, u in enumerate(users[:10], 1): # Top 10 max
+        name = u.get('first_name', 'User')[:15]
+        pts = u.get('points', 0)
+        text += f"#{i:<2} {name:<15} — {pts} pts\n"
+    
+    text += (
+        f"\n━━━━━━━━━━━━━━━━━━\n\n"
+        f"➠ Earn points by searching & downloading"
+    )
     return text
 
 def format_top_searches(searches):
-    """Professional Trending Searches."""
-    text = "🔥 <b>TRENDING MOVIES</b>\n────────────────────\n"
-    for i, s in enumerate(searches, 1):
-        text += f"➲ {i}. {s['query'].upper()} ({s['count']} 🔥)\n"
-    text += "────────────────────"
+    text = (
+        f"🔥 <b>Trending Movies</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+    )
+    for i, s in enumerate(searches[:10], 1):
+        text += f"#{i:<2} {s['query'].upper():<15} — {s['count']} 🔥\n"
+        
+    text += (
+        f"\n━━━━━━━━━━━━━━━━━━\n\n"
+        f"➠ Tap Search below to find your movie"
+    )
     return text
 
 def format_quiz(question, options):
-    return (
-        f"🧩 <b>FLASH QUIZ!</b>\n"
-        f"────────────────────\n"
+    text = (
+        f"🧩 <b>Flash Quiz</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
         f"<b>Q: {question}</b>\n\n"
-        f"➲ <b>Select Answer:</b>\n"
-        f"   {', '.join(map(str, options))}\n"
-        f"────────────────────\n"
-        f"💰 Reward: <b>+5 Gems</b>"
+        f"▸ Select the correct answer below\n"
+        f"▸ Reward: +5 Gems\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"➠ Quick, before someone else grabs it!"
+    )
+    return text
+
+def format_stats(s):
+    return (
+        f"📊 <b>System Intelligence</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"▸ Users       : {s.get('users', 0)}+\n"
+        f"▸ Files       : {s.get('files', 0)}+\n"
+        f"▸ Searches    : {s.get('searches', 0)}+\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"➠ System operating at peak efficiency"
     )
 
 def format_help():
     return (
-        f"📖 <b>ADVANCED COMMAND GUIDE</b>\n"
-        f"────────────────────\n"
-        f"➲ <b>PUBLIC COMMANDS</b>\n"
-        f"➤ `/search` - Find any movie\n"
-        f"➤ `/me` - User stats & level\n"
-        f"➤ `/leaderboard` - Top users\n"
-        f"➤ `/top` - Trending searches\n"
-        f"➤ `/stats` - System statistics\n\n"
-        f"➲ <b>ADMIN CONTROL</b>\n"
-        f"➤ `/requests` - Pending requests\n"
-        f"➤ `/broadcast` - Mass message\n"
-        f"────────────────────\n"
-        f"⚠️ <i>Join Force Channel for Access</i>"
+        f"📖 <b>Command Guide</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"▸ /search - Find movies\n"
+        f"▸ /me - View profile\n"
+        f"▸ /leaderboard - Top users\n"
+        f"▸ /top - Trending searches\n"
+        f"▸ /stats - System stats\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"➠ Tap buttons below to explore"
     )
 
 def format_about():
     return (
-        f"ℹ️ <b>BOT INFORMATION</b>\n"
-        f"────────────────────\n"
-        f"🔹 Build: <code>v4.5 Enterprise</code>\n"
-        f"🔹 Status: <code>Stable ⚡</code>\n"
-        f"🔹 Database: <code>Cluster High Speed ☁️</code>\n"
-        f"────────────────────\n"
-        f"Developed by @philobots Network."
+        f"ℹ️ <b>Bot Information</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"▸ Build       : v5.0 Elite\n"
+        f"▸ Status      : Stable ⚡\n"
+        f"▸ Network     : @philobots\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"➠ Experiencing issues? Join support."
     )
 
 def format_guide():

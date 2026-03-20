@@ -4,7 +4,7 @@ from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, FORCE_SUB
 from parser import parse_movie_data
 from database import db
 from tmdb_helper import get_movie_details
-from ui_templates import format_movie_card, format_quiz, format_start, format_guide, format_help, format_about
+from ui_templates import format_movie_card, format_quiz, format_start, format_guide, format_help, format_about, format_profile, format_leaderboard, format_top_searches, format_stats
 from profile_card import generate_profile_card, generate_leaderboard_card, generate_top_searches_card, generate_stats_card
 import logging
 import asyncio
@@ -69,19 +69,23 @@ async def show_loading(message: Message):
 
 # --- COMMANDS ---
 
+def get_nav_markup():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏆 View Leaderboard", callback_data="nav_leaderboard"), InlineKeyboardButton("🎲 Play Quiz", callback_data="nav_quiz")],
+        [InlineKeyboardButton("🔍 Search Movie", callback_data="nav_search"), InlineKeyboardButton("❓ Help", callback_data="help")]
+    ])
+
 @bot.on_message(filters.command("start") & filters.private)
 @handle_errors
 async def start_cmd(client, message: Message):
-    buttons = [
-        [InlineKeyboardButton("📢 Channel", url=SUPPORT_CHANNEL), InlineKeyboardButton("💬 Support GC", url=GC_LINK)],
-        [InlineKeyboardButton("❓ Help", callback_data="help")]
-    ]
-    await message.reply_text(format_start(0, 0, message.from_user.first_name), reply_markup=InlineKeyboardMarkup(buttons))
+    s = await db.get_total_stats()
+    text = format_start(s.get('users', 0), s.get('files', 0), message.from_user.first_name)
+    await message.reply_text(text, reply_markup=get_nav_markup())
 
 @bot.on_message(filters.command("help") & filters.private)
 @handle_errors
 async def help_cmd(client, message: Message):
-    await message.reply_text(format_help())
+    await message.reply_text(format_help(), reply_markup=get_nav_markup())
 
 @bot.on_message(filters.command("about") & filters.private)
 @handle_errors
@@ -125,8 +129,9 @@ async def me_cmd(client, message: Message):
     
     path = generate_profile_card(full_name, username, user_id, bio, rank, gems, searches, downloads, joined, avatar_path=final_avatar)
     
+    caption_text = format_profile(full_name, profile)
     try:
-        await message.reply_photo(photo=path, caption=f"✨ <b>{full_name}'s Premium Status</b>")
+        await message.reply_photo(photo=path, caption=caption_text, reply_markup=get_nav_markup())
         await load_msg.delete()
     finally:
         if os.path.exists(path): os.remove(path)
@@ -137,9 +142,10 @@ async def me_cmd(client, message: Message):
 async def lb_cmd(client, message: Message):
     load_msg = await message.reply_text("Loading Leaderboard...")
     users = await db.get_leaderboard()
+    caption_text = format_leaderboard(users)
     try:
         path = generate_leaderboard_card(users)
-        await message.reply_photo(photo=path, caption="🏆 <b>Global Standings</b>")
+        await message.reply_photo(photo=path, caption=caption_text, reply_markup=get_nav_markup())
         if os.path.exists(path): os.remove(path)
     except Exception as e:
         logger.error(f"Image Error: {e}")
@@ -164,9 +170,10 @@ async def id_cmd(client, message: Message):
 async def top_cmd(client, message: Message):
     load_msg = await message.reply_text("Loading Trending...")
     searches = await db.get_top_searches()
+    caption_text = format_top_searches(searches)
     try:
         path = generate_top_searches_card(searches)
-        await message.reply_photo(photo=path, caption="🔥 <b>Trending Movies Right Now</b>")
+        await message.reply_photo(photo=path, caption=caption_text, reply_markup=get_nav_markup())
         if os.path.exists(path): os.remove(path)
     except Exception as e:
         logger.error(f"Image Error: {e}")
@@ -260,16 +267,30 @@ async def index_handler(client, message: Message):
 @bot.on_callback_query(filters.regex(r'^help$'))
 @handle_errors
 async def help_cb_handler(client, callback: CallbackQuery):
-    await callback.message.edit_text(format_help(), reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="start")]]))
+    await callback.message.edit_text(format_help(), reply_markup=get_nav_markup())
 
 @bot.on_callback_query(filters.regex(r'^start$'))
 @handle_errors
 async def start_cb_handler(client, callback: CallbackQuery):
-    buttons = [
-        [InlineKeyboardButton("📢 Channel", url=SUPPORT_CHANNEL), InlineKeyboardButton("💬 Support GC", url=GC_LINK)],
-        [InlineKeyboardButton("❓ Help", callback_data="help")]
-    ]
-    await callback.message.edit_text(format_start(0, 0, callback.from_user.first_name), reply_markup=InlineKeyboardMarkup(buttons))
+    s = await db.get_total_stats()
+    text = format_start(s.get('users', 0), s.get('files', 0), callback.from_user.first_name)
+    await callback.message.edit_text(text, reply_markup=get_nav_markup())
+
+@bot.on_callback_query(filters.regex(r'^nav_leaderboard$'))
+@handle_errors
+async def nav_lb_handler(client, callback: CallbackQuery):
+    await lb_cmd(client, callback.message)
+    await callback.answer()
+
+@bot.on_callback_query(filters.regex(r'^nav_quiz$'))
+@handle_errors
+async def nav_quiz_handler(client, callback: CallbackQuery):
+    await callback.answer("Quizzes run automatically every 20 minutes! Watch the group.", show_alert=True)
+
+@bot.on_callback_query(filters.regex(r'^nav_search$'))
+@handle_errors
+async def nav_search_handler(client, callback: CallbackQuery):
+    await callback.answer("Type /search [movie name] to search!", show_alert=True)
 
 @bot.on_callback_query(filters.regex(r'^dl_'))
 @handle_errors
@@ -371,9 +392,10 @@ async def gen_card_handler(client, callback: CallbackQuery):
 async def stats_cmd(client, message: Message):
     load_msg = await message.reply_text("Loading Stats...")
     s = await db.get_total_stats()
+    caption_text = format_stats(s)
     try:
         path = generate_stats_card(s)
-        await message.reply_photo(photo=path, caption="📊 <b>Global Network Status</b>")
+        await message.reply_photo(photo=path, caption=caption_text, reply_markup=get_nav_markup())
         if os.path.exists(path): os.remove(path)
     except Exception as e:
         logger.error(f"Image Error: {e}")
