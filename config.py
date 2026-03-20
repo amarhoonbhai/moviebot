@@ -13,7 +13,7 @@ CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002363198816"))
 ADMIN_IDS = [int(i.strip()) for i in os.environ.get("ADMIN_IDS", "5459345700").split(",") if i.strip()]
 # Force Subscription Channel
 FORCE_SUB_CHANNEL = os.environ.get("FORCE_SUB_CHANNEL", "@philobots")
-TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
+TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "06aeac42c2ecb10a367dc30304476c0d")
 GROUP_ID = int(os.environ.get("GROUP_ID", "-1001548130580"))
 SUPPORT_CHANNEL = os.environ.get("SUPPORT_CHANNEL", "https://t.me/philobots")
 GC_LINK = os.environ.get("GC_LINK", "https://t.me/Waifu_Grabber_Bots")
