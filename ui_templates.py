@@ -32,16 +32,21 @@ def format_profile(p):
     level_progress = (points % 100) // 10
     bar = "▰" * level_progress + "▱" * (10 - level_progress)
 
+    # Professional Progress Bar (The "Line")
+    level_progress = (points % 100) // 5
+    bar = "█" * level_progress + "░" * (20 - level_progress)
+
     return (
         f"👤 <b>USER DASHBOARD</b>\n"
         f"────────────────────\n"
+        f"🆔 <b>User ID</b>: <code>{p.get('telegram_user_id', 'N/A')}</code>\n"
         f"🏆 <b>Global Rank</b>: <code>#{p.get('rank', 'N/A')}</code>\n"
         f"💎 <b>Total Gems</b>: <code>{points}</code>\n\n"
-        f"➲ <b>LOYALTY PROGRESS</b>\n"
-        f"⮩ <code>{bar}</code>\n\n"
+        f"📈 <b>LEVEL PROGRESS</b>\n"
+        f"<code>{bar}</code>\n\n"
         f"➲ <b>ACTIVITY STATS</b>\n"
-        f"🔹 Searches: <code>{p.get('total_searches', 0)}</code>\n"
-        f"🔸 Downloads: <code>{p.get('total_downloads', 0)}</code>\n\n"
+        f"⮩ Searches: <code>{p.get('total_searches', 0)}</code>\n"
+        f"⮩ Downloads: <code>{p.get('total_downloads', 0)}</code>\n\n"
         f"📅 <b>Membership</b>: <code>{joined}</code>\n"
         f"────────────────────"
     )

@@ -14,3 +14,5 @@ movie_bot.session-journal
 # OS junk
 .DS_Store
 Thumbs.db
+*.png
+*.jpg

@@ -4,8 +4,8 @@ from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, FORCE_SUB
 from parser import parse_movie_data
 from database import db
 from tmdb_helper import get_movie_details
-from ui_templates import format_movie_card, format_leaderboard, format_quiz, format_start, format_guide, format_top_searches, format_help, format_about, format_profile
-from profile_card import generate_profile_card
+from ui_templates import format_movie_card, format_quiz, format_start, format_guide, format_help, format_about
+from profile_card import generate_profile_card, generate_leaderboard_card, generate_top_searches_card, generate_stats_card
 import logging
 import asyncio
 import os
@@ -72,7 +72,11 @@ async def show_loading(message: Message):
 @bot.on_message(filters.command("start") & filters.private)
 @handle_errors
 async def start_cmd(client, message: Message):
-    await message.reply_text(format_start(0, 0, message.from_user.first_name))
+    buttons = [
+        [InlineKeyboardButton("📢 Channel", url=SUPPORT_CHANNEL), InlineKeyboardButton("💬 Support GC", url=GC_LINK)],
+        [InlineKeyboardButton("❓ Help", callback_data="help")]
+    ]
+    await message.reply_text(format_start(0, 0, message.from_user.first_name), reply_markup=InlineKeyboardMarkup(buttons))
 
 @bot.on_message(filters.command("help") & filters.private)
 @handle_errors
@@ -90,20 +94,83 @@ async def me_cmd(client, message: Message):
     profile = await db.get_user_profile(message.from_user.id)
     if not profile: return
     
-    btn = [[InlineKeyboardButton("📊 Generate Profile Card", callback_data="gen_card")]]
-    await message.reply_text(format_profile(profile), reply_markup=InlineKeyboardMarkup(btn))
+    load_msg = await show_loading(message)
+    
+    avatar_path = f"avatar_{message.from_user.id}.jpg"
+    final_avatar = None
+    try:
+        photos = [p async for p in client.get_chat_photos(message.from_user.id, limit=1)]
+        if photos:
+            final_avatar = await client.download_media(photos[0].file_id, file_name=avatar_path)
+    except: pass
+
+    try:
+        chat = await client.get_chat(message.from_user.id)
+        bio = chat.bio or "No bio provided."
+    except Exception:
+        bio = "No bio provided."
+
+    first_name = message.from_user.first_name or ""
+    last_name = message.from_user.last_name or ""
+    full_name = f"{first_name} {last_name}".strip() or "Unknown"
+    
+    username = message.from_user.username or "Unknown"
+    user_id = message.from_user.id
+
+    rank = profile.get('rank', 'N/A')
+    gems = profile.get('points', 0)
+    searches = profile.get('total_searches', 0)
+    downloads = profile.get('total_downloads', 0)
+    joined = profile.get('joined_at', datetime.now()).strftime("%d %b %Y")
+    
+    path = generate_profile_card(full_name, username, user_id, bio, rank, gems, searches, downloads, joined, avatar_path=final_avatar)
+    
+    try:
+        await message.reply_photo(photo=path, caption=f"✨ <b>{full_name}'s Premium Status</b>")
+        await load_msg.delete()
+    finally:
+        if os.path.exists(path): os.remove(path)
+        if final_avatar and os.path.exists(final_avatar): os.remove(final_avatar)
 
 @bot.on_message(filters.command("leaderboard") & (filters.private | filters.group))
 @handle_errors
 async def lb_cmd(client, message: Message):
+    load_msg = await message.reply_text("Loading Leaderboard...")
     users = await db.get_leaderboard()
-    await message.reply_text(format_leaderboard(users))
+    try:
+        path = generate_leaderboard_card(users)
+        await message.reply_photo(photo=path, caption="🏆 <b>Global Standings</b>")
+        if os.path.exists(path): os.remove(path)
+    except Exception as e:
+        logger.error(f"Image Error: {e}")
+    await load_msg.delete()
+
+@bot.on_message(filters.command("id") & (filters.private | filters.group))
+@handle_errors
+async def id_cmd(client, message: Message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    text = (
+        f"🆔 <b>IDENTIFICATION</b>\n"
+        f"────────────────────\n"
+        f"🔹 <b>User ID</b>: <code>{user_id}</code>\n"
+        f"🔹 <b>Chat ID</b>: <code>{chat_id}</code>\n"
+        f"────────────────────"
+    )
+    await message.reply_text(text)
 
 @bot.on_message(filters.command("top") & (filters.private | filters.group))
 @handle_errors
 async def top_cmd(client, message: Message):
+    load_msg = await message.reply_text("Loading Trending...")
     searches = await db.get_top_searches()
-    await message.reply_text(format_top_searches(searches))
+    try:
+        path = generate_top_searches_card(searches)
+        await message.reply_photo(photo=path, caption="🔥 <b>Trending Movies Right Now</b>")
+        if os.path.exists(path): os.remove(path)
+    except Exception as e:
+        logger.error(f"Image Error: {e}")
+    await load_msg.delete()
 
 @bot.on_message(filters.command("search") & (filters.private | filters.group))
 @handle_errors
@@ -190,6 +257,20 @@ async def index_handler(client, message: Message):
 
 # --- CALLBACKS ---
 
+@bot.on_callback_query(filters.regex(r'^help$'))
+@handle_errors
+async def help_cb_handler(client, callback: CallbackQuery):
+    await callback.message.edit_text(format_help(), reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="start")]]))
+
+@bot.on_callback_query(filters.regex(r'^start$'))
+@handle_errors
+async def start_cb_handler(client, callback: CallbackQuery):
+    buttons = [
+        [InlineKeyboardButton("📢 Channel", url=SUPPORT_CHANNEL), InlineKeyboardButton("💬 Support GC", url=GC_LINK)],
+        [InlineKeyboardButton("❓ Help", callback_data="help")]
+    ]
+    await callback.message.edit_text(format_start(0, 0, callback.from_user.first_name), reply_markup=InlineKeyboardMarkup(buttons))
+
 @bot.on_callback_query(filters.regex(r'^dl_'))
 @handle_errors
 async def dl_handler(client, callback: CallbackQuery):
@@ -253,6 +334,15 @@ async def gen_card_handler(client, callback: CallbackQuery):
     
     await callback.answer("🎨 Generating your card...")
     
+    # Download Avatar
+    avatar_path = f"avatar_{callback.from_user.id}.jpg"
+    final_avatar = None
+    try:
+        photos = [p async for p in client.get_chat_photos(callback.from_user.id, limit=1)]
+        if photos:
+            final_avatar = await client.download_media(photos[0].file_id, file_name=avatar_path)
+    except: pass
+
     # Data for the card
     name = callback.from_user.first_name
     rank = profile.get('rank', 'N/A')
@@ -262,33 +352,32 @@ async def gen_card_handler(client, callback: CallbackQuery):
     joined = profile.get('joined_at', datetime.now()).strftime("%d %b %Y")
     
     # Generate
-    path = generate_profile_card(name, rank, gems, searches, downloads, joined)
+    path = generate_profile_card(name, rank, gems, searches, downloads, joined, avatar_path=final_avatar)
     
     try:
         await callback.message.reply_photo(
             photo=path,
-            caption=f"✨ <b>{name}'s Premium Stats Card</b>\n━━━━━━━━━━━━━━━━━━━━\n<i>Generated by Pro Movie Bot v4.0</i>"
+            caption=f"✨ <b>{name}'s Premium Stats Card</b>\n────────────────────\n➲ <i>Generated by Pro Movie Bot v4.5</i>"
         )
         await callback.message.delete()
     finally:
         if os.path.exists(path): os.remove(path)
+        if final_avatar and os.path.exists(final_avatar): os.remove(final_avatar)
 
 # --- ADMIN ---
 
 @bot.on_message(filters.command("stats") & (filters.private | filters.group))
 @handle_errors
 async def stats_cmd(client, message: Message):
+    load_msg = await message.reply_text("Loading Stats...")
     s = await db.get_total_stats()
-    text = (
-        f"📊 <b>GLOBAL SYSTEM STATS</b>\n"
-        f"────────────────────\n"
-        f"➲ <b>Verified Users</b>: <code>{s['users']}+</code>\n"
-        f"➲ <b>Indexed Files</b>: <code>{s['files']}+</code>\n"
-        f"➲ <b>Total Searches</b>: <code>{s['searches']}+</code>\n"
-        f"────────────────────\n"
-        f"⚡ <i>Performance: Stable</i>"
-    )
-    await message.reply_text(text)
+    try:
+        path = generate_stats_card(s)
+        await message.reply_photo(photo=path, caption="📊 <b>Global Network Status</b>")
+        if os.path.exists(path): os.remove(path)
+    except Exception as e:
+        logger.error(f"Image Error: {e}")
+    await load_msg.delete()
 
 @bot.on_message(filters.command("ping") & (filters.private | filters.group))
 @handle_errors
@@ -342,7 +431,8 @@ async def main():
         BotCommand("leaderboard", "🏆 Top Performance"),
         BotCommand("top", "🔥 Trending Searches"),
         BotCommand("stats", "📊 Global Statistics"),
-        BotCommand("ping", "🚀 Response Latency")
+        BotCommand("ping", "🚀 Response Latency"),
+        BotCommand("id", "🆔 Get IDs")
     ])
     await db.fix_indexes()
     scheduler.add_job(send_quiz, "interval", minutes=20)
