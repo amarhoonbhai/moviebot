@@ -137,12 +137,16 @@ async def search_cmd(client, message: Message):
     # For now, we show the first file. Future: Pagination menu.
     row = []
     for r in results[:5]: # Show top 5 qualities/files for this query
-        row.append(InlineKeyboardButton(r.get('quality', 'DL'), callback_data=f"dl_{r['_id']}"))
+        quality = r.get('quality', 'DL')
+        btn_text = quality if quality != "Unknown" else "Download 📥"
+        row.append(InlineKeyboardButton(btn_text, callback_data=f"dl_{r['_id']}"))
         if len(row) == 2:
             buttons.append(row); row = []
     if row: buttons.append(row)
 
-    text = format_movie_card(name, year, metadata['rating'] if metadata else "N/A", data.get('language', 'Unknown'))
+    lang = data.get('language', 'Multi')
+    if lang == "Unknown": lang = "Multi"
+    text = format_movie_card(name, year, metadata['rating'] if metadata else "N/A", lang)
     
     try:
         if metadata and metadata['poster']:
