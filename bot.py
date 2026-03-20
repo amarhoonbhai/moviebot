@@ -275,11 +275,41 @@ async def gen_card_handler(client, callback: CallbackQuery):
 
 # --- ADMIN ---
 
-@bot.on_message(filters.command("stats") & filters.user(ADMIN_IDS))
+@bot.on_message(filters.command("stats") & (filters.private | filters.group))
 @handle_errors
 async def stats_cmd(client, message: Message):
     s = await db.get_total_stats()
-    text = f"📊 **SYSTEM STATS**\n━━━━━━━━━━━━━━━━━━━━\nUsers: {s['users']}\nFiles: {s['files']}\nSearches: {s['searches']}\n━━━━━━━━━━━━━━━━━━━━"
+    text = (
+        f"📊 <b>GLOBAL SYSTEM STATS</b>\n"
+        f"────────────────────\n"
+        f"➲ <b>Verified Users</b>: <code>{s['users']}+</code>\n"
+        f"➲ <b>Indexed Files</b>: <code>{s['files']}+</code>\n"
+        f"➲ <b>Total Searches</b>: <code>{s['searches']}+</code>\n"
+        f"────────────────────\n"
+        f"⚡ <i>Performance: Stable</i>"
+    )
+    await message.reply_text(text)
+
+@bot.on_message(filters.command("ping") & (filters.private | filters.group))
+@handle_errors
+async def ping_cmd(client, message: Message):
+    start = datetime.now()
+    msg = await message.reply_text("🔹 <i>Pinging...</i>")
+    end = datetime.now()
+    delta = (end - start).microseconds / 1000
+    await msg.edit_text(f"🚀 <b>PONG!</b>\n────────────────────\n⮩ <code>{delta}ms</code> response")
+
+@bot.on_message(filters.command("requests") & filters.user(ADMIN_IDS))
+@handle_errors
+async def requests_cmd(client, message: Message):
+    reqs = await db.get_pending_requests()
+    if not reqs:
+        return await message.reply_text("✅ <b>No pending requests!</b>")
+    
+    text = "📂 <b>PENDING MOVIE REQUESTS</b>\n────────────────────\n"
+    for r in reqs:
+        text += f"⮩ <code>{r['query'].upper()}</code>\n"
+    text += "────────────────────"
     await message.reply_text(text)
 
 @bot.on_message(filters.command("broadcast") & filters.user(ADMIN_IDS))
@@ -306,12 +336,13 @@ async def delete_msg(msg, delay):
 async def main():
     await bot.start()
     await bot.set_bot_commands([
-        BotCommand("start", "Home"),
-        BotCommand("search", "Find movies"),
-        BotCommand("me", "Profile"),
-        BotCommand("leaderboard", "Top users"),
-        BotCommand("top", "Trending"),
-        BotCommand("stats", "Admin stats")
+        BotCommand("start", "➲ Home"),
+        BotCommand("search", "➤ Find movies"),
+        BotCommand("me", "👤 User Profile"),
+        BotCommand("leaderboard", "🏆 Top Performance"),
+        BotCommand("top", "🔥 Trending Searches"),
+        BotCommand("stats", "📊 Global Statistics"),
+        BotCommand("ping", "🚀 Response Latency")
     ])
     await db.fix_indexes()
     scheduler.add_job(send_quiz, "interval", minutes=20)

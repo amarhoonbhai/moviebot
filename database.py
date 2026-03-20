@@ -176,4 +176,7 @@ class Database:
             "query": query, "user_id": user_id, "requested_at": datetime.utcnow()
         })
 
+    async def get_pending_requests(self, limit=20):
+        return await self.requests.find().sort("requested_at", -1).limit(limit).to_list(length=limit)
+
 db = Database()
