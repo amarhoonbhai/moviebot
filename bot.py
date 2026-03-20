@@ -4,12 +4,13 @@ from config import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, FORCE_SUB
 from parser import parse_movie_data
 from database import db
 from tmdb_helper import get_movie_details
-from ui_templates import format_movie_card, format_leaderboard, format_quiz, format_start, format_guide, format_top_searches, format_stats, format_help, format_about, format_profile
+from ui_templates import format_movie_card, format_leaderboard, format_quiz, format_start, format_guide, format_top_searches, format_help, format_about, format_profile
 import logging
 import asyncio
 import random
 from datetime import datetime, time
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from bson import ObjectId
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
