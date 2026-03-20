@@ -13,3 +13,4 @@ CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002363198816"))
 ADMIN_IDS = [int(i.strip()) for i in os.environ.get("ADMIN_IDS", "5459345700").split(",") if i.strip()]
 # Force Subscription Channel
 FORCE_SUB_CHANNEL = os.environ.get("FORCE_SUB_CHANNEL", "@philobots")
+TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")

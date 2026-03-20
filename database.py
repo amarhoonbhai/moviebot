@@ -10,14 +10,47 @@ class Database:
         self.files = self.db.files
         self.users = self.db.users
         self.requests = self.db.requests
+        self.analytics = self.db.analytics
 
-    async def add_user(self, user_id: int):
-        """Adds a new user if they don't exist."""
+    async def add_user(self, user_id: int, first_name: str = "", last_name: str = ""):
+        """Adds a new user if they don't exist and updates their name."""
         await self.users.update_one(
             {"user_id": user_id},
-            {"$set": {"user_id": user_id}},
+            {"$set": {
+                "user_id": user_id,
+                "first_name": first_name,
+                "last_name": last_name
+            }, "$setOnInsert": {"points": 0}},
             upsert=True
         )
+
+    async def update_points(self, user_id: int, points: int):
+        """Increments points for a user."""
+        await self.users.update_one(
+            {"user_id": user_id},
+            {"$inc": {"points": points}},
+            upsert=True
+        )
+
+    async def get_leaderboard(self, limit=10):
+        """Returns top users by points."""
+        cursor = self.users.find().sort("points", -1).limit(limit)
+        return await cursor.to_list(length=limit)
+
+    async def track_search(self, movie_name: str):
+        """Track all movie searches for analytics."""
+        # We'll use a separate collection for analytics if needed, or update files.
+        # For simplicity, we'll increment a global search counter per movie name.
+        await self.db.analytics.update_one(
+            {"movie_name": movie_name.lower()},
+            {"$inc": {"total_searches": 1}},
+            upsert=True
+        )
+
+    async def get_top_searches(self, limit=10):
+        """Returns top searched movies."""
+        cursor = self.db.analytics.find().sort("total_searches", -1).limit(limit)
+        return await cursor.to_list(length=limit)
 
     async def save_request(self, query: str, user_id: int):
         """Saves a movie request from a user."""
@@ -62,6 +95,20 @@ class Database:
 
     async def get_total_files(self):
         return await self.files.count_documents({})
+
+    async def get_total_search_count(self):
+        """Calculates total search count across all analytics."""
+        pipeline = [{"$group": {"_id": None, "total": {"$sum": "$total_searches"}}}]
+        cursor = self.db.analytics.aggregate(pipeline)
+        result = await cursor.to_list(length=1)
+        return result[0]["total"] if result else 0
+
+    async def get_total_points(self):
+        """Calculates total points across all users."""
+        pipeline = [{"$group": {"_id": None, "total": {"$sum": "$points"}}}]
+        cursor = self.users.aggregate(pipeline)
+        result = await cursor.to_list(length=1)
+        return result[0]["total"] if result else 0
 
     async def save_file(self, file_data):
         """
