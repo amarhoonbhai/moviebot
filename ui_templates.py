@@ -26,16 +26,24 @@ def format_start(users, files, name):
 def format_profile(p):
     """Detailed Professional User Profile."""
     joined = p.get('joined_at', datetime.now()).strftime("%d %b %Y")
+    points = p.get('points', 0)
+    
+    # Simple Visual Progress Bar (based on gems)
+    level_progress = (points % 100) // 10
+    bar = "▰" * level_progress + "▱" * (10 - level_progress)
+
     return (
-        f"👤 <b>USER PROFILE</b>\n"
+        f"👤 <b>USER DASHBOARD</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🏅 <b>Global Rank</b>: #{p.get('rank', 'N/A')}\n"
-        f"💎 <b>Gems</b>: {p.get('points', 0)}\n\n"
-        f"📊 <b>Stats</b>\n"
-        f"🔍 Searches: {p.get('total_searches', 0)}\n"
-        f"📥 Downloads: {p.get('total_downloads', 0)}\n"
-        f"📅 Joined: {joined}\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
+        f"🏆 <b>Global Rank</b>: <code>#{p.get('rank', 'N/A')}</code>\n"
+        f"💎 <b>Total Gems</b>: <code>{points}</code>\n\n"
+        f"📊 <b>LOYALTY PROGRESS</b>\n"
+        f"<code>{bar}</code>\n\n"
+        f"🔍 <b>Searches</b>: <code>{p.get('total_searches', 0)}</code>\n"
+        f"📥 <b>Downloads</b>: <code>{p.get('total_downloads', 0)}</code>\n"
+        f"📅 <b>Joined</b>: <code>{joined}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 <i>Earn gems by participating in quizes!</i>"
     )
 
 def format_leaderboard(users):

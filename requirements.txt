@@ -8,4 +8,4 @@ cinemagoer
 aiohttp
 apscheduler
 tzlocal
-; platform_system != 'Windows'
+Pillow
