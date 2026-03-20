@@ -7,4 +7,5 @@ uvloop
 cinemagoer
 aiohttp
 apscheduler
+tzlocal
 ; platform_system != 'Windows'

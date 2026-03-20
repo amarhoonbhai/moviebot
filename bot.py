@@ -135,12 +135,12 @@ async def start_cmd(client, message: Message):
     
     buttons = [
         [
-            InlineKeyboardButton("🔍 Search Movie", switch_inline_query_current_chat=""),
-            InlineKeyboardButton("🏆 Leaderboard", callback_data="show_lb")
+            InlineKeyboardButton("🔍 🔴 Search Movie", switch_inline_query_current_chat=""),
+            InlineKeyboardButton("🏆 🟡 Leaderboard", callback_data="show_lb")
         ],
         [
-            InlineKeyboardButton("❓ Help Guide", callback_data="show_guide"),
-            InlineKeyboardButton("📊 Analytics", callback_data="show_top")
+            InlineKeyboardButton("❓ 🟢 Help Guide", callback_data="show_guide"),
+            InlineKeyboardButton("📊 🔵 Analytics", callback_data="show_top")
         ]
     ]
     
@@ -206,8 +206,10 @@ async def search_cmd(client, message: Message):
     
     buttons = []
     row = []
-    for file in data["files"]:
-        row.append(InlineKeyboardButton(f"[{file['quality']}]", callback_data=f"dl_{file['db_id']}"))
+    colors = ["🔴", "🟡", "🟢", "🔵", "🟣"]
+    for i, file in enumerate(data["files"]):
+        color = colors[i % len(colors)]
+        row.append(InlineKeyboardButton(f"{color} [{file['quality']}]", callback_data=f"dl_{file['db_id']}"))
         if len(row) == 2:
             buttons.append(row)
             row = []
@@ -288,7 +290,8 @@ async def stats_cmd(client, message: Message):
     points = await db.get_total_points()
     
     lb = await db.get_leaderboard(limit=1)
-    top_user = f"{lb[0]['first_name']} ({lb[0]['points']} pts)" if lb else "None"
+    top_user_data = lb[0] if lb else {}
+    top_user = f"{top_user_data.get('first_name', 'User')} ({top_user_data.get('points', 0)} pts)" if lb else "None"
     
     await message.reply_text(format_stats(users, files, searches, points, top_user))
 
