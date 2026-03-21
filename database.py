@@ -61,7 +61,9 @@ class Database:
                     "points": 0,
                     "total_searches": 0,
                     "total_downloads": 0,
-                    "joined_at": datetime.utcnow()
+                    "joined_at": datetime.utcnow(),
+                    "is_banned": False,
+                    "last_daily": None
                 }
             },
             upsert=True
@@ -89,6 +91,34 @@ class Database:
         """Top users by points."""
         return await self.users.find().sort("points", -1).limit(limit).to_list(length=limit)
 
+    async def ban_user(self, user_id: int):
+        await self.users.update_one({"telegram_user_id": user_id}, {"$set": {"is_banned": True}})
+
+    async def unban_user(self, user_id: int):
+        await self.users.update_one({"telegram_user_id": user_id}, {"$set": {"is_banned": False}})
+
+    async def delete_user(self, user_id: int):
+        await self.users.delete_one({"telegram_user_id": user_id})
+
+    async def claim_daily(self, user_id: int, points: int = 2):
+        user = await self.users.find_one({"telegram_user_id": user_id})
+        if not user: return False, 0
+        
+        now = datetime.utcnow()
+        last_daily = user.get("last_daily")
+        
+        if last_daily and (now - last_daily).total_seconds() < 86400:
+            return False, 0
+            
+        await self.users.update_one(
+            {"telegram_user_id": user_id},
+            {
+                "$inc": {"points": points},
+                "$set": {"last_daily": now}
+            }
+        )
+        return True, user.get("points", 0) + points
+
     async def save_file(self, file_data):
         """Ultra-Stable Atomic File Save (Upsert)."""
         file_unique_id = file_data.get("file_unique_id")
@@ -112,12 +142,35 @@ class Database:
             logger.error(f"Error saving file: {e}")
             return False
 
+    async def delete_file(self, db_id: str):
+        """Delete a file from the database by ObjectId."""
+        try:
+            result = await self.files.delete_one({"_id": ObjectId(db_id)})
+            return result.deleted_count > 0
+        except Exception as e:
+            logger.error(f"Error deleting file {db_id}: {e}")
+            return False
+
     async def search_movies(self, query: str, offset=0, limit=10):
-        """Optimized case-insensitive search with pagination."""
         cursor = self.files.find({
             "movie_name": {"$regex": query, "$options": "i"}
         }).sort("indexed_at", -1).skip(offset).limit(limit)
         return await cursor.to_list(length=limit)
+
+    async def get_tmdb_cache(self, query: str, year: str = None):
+        filter_q = {"query": query.lower()}
+        if year: filter_q["year"] = year
+        cache = await self.db.tmdb_cache.find_one(filter_q)
+        if cache and (datetime.utcnow() - cache.get("cached_at", datetime.utcnow())).days < 7:
+            return cache["data"]
+        return None
+        
+    async def save_tmdb_cache(self, query: str, year: str, data: dict):
+        await self.db.tmdb_cache.update_one(
+            {"query": query.lower(), "year": year},
+            {"$set": {"data": data, "cached_at": datetime.utcnow()}},
+            upsert=True
+        )
 
     async def get_total_files_count(self, query: str = ""):
         filter_q = {"movie_name": {"$regex": query, "$options": "i"}} if query else {}

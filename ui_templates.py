@@ -1,37 +1,38 @@
 from datetime import datetime
 
-def format_movie_card(name, year, rating, language):
+# --- DESIGN SYSTEM ---
+DOT = "▪"
+
+def format_movie_card(name, year, rating, language, runtime, genres, director, cast, plot):
     return (
-        f"🎬 <b>{name}</b>\n\n"
-        f"<blockquote>\n"
-        f"▸ Year       : <code>{year}</code>\n"
-        f"▸ Rating     : <code>{rating}/10</code>\n"
-        f"▸ Language   : <code>{language}</code>\n"
-        f"</blockquote>\n\n"
-        f"➠ Select a file below to download"
+        f"🎬 <b>{str(name).upper()}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<b>{DOT} Release Year:</b>  <code>{year}</code> | <b>⏱</b> <code>{runtime}</code>\n"
+        f"<b>{DOT} Genres:</b>  <code>{genres}</code>\n"
+        f"<b>{DOT} TMDb Rating:</b>  <code>{rating}/10</code>\n"
+        f"<b>{DOT} Director:</b>  <code>{director}</code>\n"
+        f"<b>{DOT} Cast:</b>  <code>{cast}</code>\n"
+        f"<b>{DOT} Audio Track:</b>  <code>{language}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💬 <i>{plot}</i>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Select your preferred quality below</i>"
     )
 
 def get_greeting():
     hour = datetime.now().hour
-    if hour < 12:
-        return "Good morning"
-    elif 12 <= hour < 18:
-        return "Good afternoon"
-    else:
-        return "Good evening"
+    if hour < 12: return "Good morning"
+    elif 12 <= hour < 18: return "Good afternoon"
+    else: return "Good evening"
 
 def format_start(users, files, name):
-    greeting = get_greeting()
     return (
-        f"✨ <b>{greeting}, {name}!</b>\n\n"
-        f"Welcome to the ultimate Premium Movie Engine.\n"
-        f"Search, track, and download movies instantly while earning gems to climb the global leaderboard! 🏆\n\n"
-        f"<blockquote expandable>\n"
-        f"▸ Status      : Online 🟢\n"
-        f"▸ Users       : {users}+\n"
-        f"▸ Files       : {files}+\n"
-        f"</blockquote>\n\n"
-        f"➠ Use the menu below to navigate"
+        f"<b>{get_greeting()}, {name}</b>\n\n"
+        f"Welcome to the Movie Database. Search, track, and download movies instantly.\n\n"
+        f"<b>System Status</b>\n"
+        f"<b>{DOT} Active Users:</b> <code>{users:,}</code>\n"
+        f"<b>{DOT} Indexed Files:</b> <code>{files:,}</code>\n\n"
+        f"<i>Use the menu to navigate</i>"
     )
 
 def get_rank_level(points):
@@ -48,84 +49,79 @@ def format_profile(name, p):
     level = get_rank_level(points)
     
     return (
-        f"✨ <b>{name}'s Profile</b>\n\n"
-        f"<blockquote>\n"
-        f"<b>USER STATUS</b>\n\n"
-        f"▸ Rank        : {rank_str}\n"
-        f"▸ Level       : {level} User\n"
-        f"▸ Activity    : Active\n"
-        f"</blockquote>\n"
-        f"<blockquote>\n"
-        f"<b>ACTIVITY</b>\n\n"
-        f"▸ Gems        : {points}\n"
-        f"▸ Searches    : {searches}\n"
-        f"▸ Downloads   : {downloads}\n"
-        f"</blockquote>\n\n"
-        f"➠ Keep searching to climb leaderboard"
+        f"<b>User Profile:</b> {name}\n\n"
+        f"<b>Status</b>\n"
+        f"<b>{DOT} Global Rank:</b> <code>{rank_str}</code>\n"
+        f"<b>{DOT} Authority Level:</b> <code>{level}</code>\n\n"
+        f"<b>Activity</b>\n"
+        f"<b>{DOT} Total Gems:</b> <code>{points}</code>\n"
+        f"<b>{DOT} Searches:</b> <code>{searches}</code>\n"
+        f"<b>{DOT} Downloads:</b> <code>{downloads}</code>\n"
     )
 
 def format_leaderboard(users):
-    text = f"🏆 <b>Top Players</b>\n\n<blockquote expandable>\n"
+    text = f"<b>Global Leaderboard</b>\n\n"
     for i, u in enumerate(users[:10], 1): # Top 10 max
         name = u.get('first_name', 'User')[:15]
         pts = u.get('points', 0)
-        text += f"#{i:<2} {name:<15} — {pts} pts\n"
+        prefix = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"<b>{i}.</b>"
+        text += f"{prefix} {name} <b>—</b> <code>{pts} pts</code>\n"
     
-    text += "</blockquote>\n\n➠ Earn points by searching & downloading"
+    text += "\n<i>Earn more points by participating</i>"
     return text
 
+def format_daily(points_added, new_total):
+    return (
+        f"<b>Daily Reward Claimed!</b>\n\n"
+        f"<b>{DOT} Received:</b> <code>+{points_added} Gems</code>\n"
+        f"<b>{DOT} Total Balance:</b> <code>{new_total}</code>\n\n"
+        f"<i>Come back in 24 hours for more</i>"
+    )
+
 def format_top_searches(searches):
-    text = f"🔥 <b>Trending Movies</b>\n\n<blockquote expandable>\n"
+    text = f"<b>Trending Searches</b>\n\n"
     for i, s in enumerate(searches[:10], 1):
-        text += f"#{i:<2} {s['query'].upper():<15} — {s['count']} 🔥\n"
+        try:
+            query_name = s['query'].title()
+        except KeyError:
+            query_name = "Unknown"
+        text += f"<b>{i}.</b> {query_name} <b>—</b> <code>{s.get('count', 0)} times</code>\n"
         
-    text += "</blockquote>\n\n➠ Tap Search below to find your movie"
     return text
 
 def format_quiz(question, options):
     return (
-        f"🧩 <b>Flash Quiz</b>\n\n"
-        f"<blockquote>\n"
-        f"<b>Q: {question}</b>\n\n"
-        f"▸ Select the correct answer below\n"
-        f"▸ Reward: +5 Gems\n"
-        f"</blockquote>\n\n"
-        f"➠ Quick, before someone else grabs it!"
+        f"<b>Flash Quiz</b>\n\n"
+        f"<b>Question:</b> {question}\n\n"
+        f"<b>{DOT} Reward:</b> <code>+5 Gems</code>\n"
+        f"<b>{DOT} Rule:</b> First correct answer wins.\n\n"
+        f"<i>Select your answer below</i>"
     )
 
 def format_stats(s):
     return (
-        f"📊 <b>System Intelligence</b>\n\n"
-        f"<blockquote>\n"
-        f"▸ Users       : {s.get('users', 0)}+\n"
-        f"▸ Files       : {s.get('files', 0)}+\n"
-        f"▸ Searches    : {s.get('searches', 0)}+\n"
-        f"</blockquote>\n\n"
-        f"➠ System operating at peak efficiency"
+        f"<b>System Intelligence</b>\n\n"
+        f"<b>{DOT} Total Users:</b> <code>{s.get('users', 0):,}</code>\n"
+        f"<b>{DOT} Movies Indexed:</b> <code>{s.get('files', 0):,}</code>\n"
+        f"<b>{DOT} Lifetime Searches:</b> <code>{s.get('searches', 0):,}</code>\n"
     )
 
 def format_help():
     return (
-        f"📖 <b>Command Guide</b>\n\n"
-        f"<blockquote>\n"
-        f"▸ /search - Find movies\n"
-        f"▸ /me - View profile\n"
-        f"▸ /leaderboard - Top users\n"
-        f"▸ /top - Trending searches\n"
-        f"▸ /stats - System stats\n"
-        f"</blockquote>\n\n"
-        f"➠ Tap buttons below to explore"
+        f"<b>Command Guide</b>\n\n"
+        f"<b>{DOT}</b> <code>/search</code> - Find movies in the database\n"
+        f"<b>{DOT}</b> <code>/me</code> - View your profile\n"
+        f"<b>{DOT}</b> <code>/leaderboard</code> - View top users\n"
+        f"<b>{DOT}</b> <code>/top</code> - Discover trending movies\n"
+        f"<b>{DOT}</b> <code>/stats</code> - View live system stats\n"
     )
 
 def format_about():
     return (
-        f"ℹ️ <b>Bot Information</b>\n\n"
-        f"<blockquote>\n"
-        f"▸ Build       : v5.0 Elite\n"
-        f"▸ Status      : Stable ⚡\n"
-        f"▸ Network     : @philobots\n"
-        f"</blockquote>\n\n"
-        f"➠ Experiencing issues? Join support."
+        f"<b>System Information</b>\n\n"
+        f"<b>{DOT} Core Build:</b> <code>v7.0 Minimalist</code>\n"
+        f"<b>{DOT} Server Status:</b> <code>Online</code>\n"
+        f"<b>{DOT} Network:</b> <code>@philobots</code>\n"
     )
 
 def format_guide():

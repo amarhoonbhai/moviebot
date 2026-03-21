@@ -1,0 +1,59 @@
+import asyncio
+import logging
+from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram import enums
+from config import FORCE_SUB_CHANNEL
+from database import db
+
+logger = logging.getLogger(__name__)
+
+def handle_errors(func):
+    """Professional Error Shield."""
+    async def wrapper(client, msg, *args, **kwargs):
+        try:
+            if not msg.from_user: return
+            user_data = await db.users.find_one({"telegram_user_id": msg.from_user.id})
+            if user_data and user_data.get("is_banned"):
+                if isinstance(msg, Message): await msg.reply_text("❌ You are banned from using this bot.")
+                elif isinstance(msg, CallbackQuery): await msg.answer("❌ You are banned.", show_alert=True)
+                return
+            await db.save_user(msg.from_user)
+            return await func(client, msg, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in {func.__name__}: {e}")
+            if "DuplicateKeyError" in str(e):
+                await db.fix_indexes()
+            try:
+                text = "❌ <b>SYSTEM ERROR</b>\n━━━━━━━━━━━━━━━━━━━━\nAn unexpected error occurred. Admin has been notified."
+                if isinstance(msg, Message): await msg.reply_text(text)
+                elif isinstance(msg, CallbackQuery): await msg.answer("❌ System Error.", show_alert=True)
+            except: pass
+    return wrapper
+
+async def is_subscribed(client, user_id):
+    if not FORCE_SUB_CHANNEL or FORCE_SUB_CHANNEL.lower() == "none": return True
+    try:
+        member = await client.get_chat_member(FORCE_SUB_CHANNEL, user_id)
+        return member.status in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.MEMBER]
+    except Exception: return False
+
+async def show_loading(message: Message):
+    frames = ["🎬 Loading", "🎬 Loading.", "🎬 Loading..", "🎬 Loading..."]
+    load_msg = await message.reply_text(frames[0])
+    for _ in range(2):
+        for f in frames:
+            await asyncio.sleep(0.4)
+            try: await load_msg.edit_text(f)
+            except: pass
+    return load_msg
+
+def get_nav_markup():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏆 View Leaderboard", callback_data="nav_leaderboard"), InlineKeyboardButton("🎲 Play Quiz", callback_data="nav_quiz")],
+        [InlineKeyboardButton("🔍 Search Movie", callback_data="nav_search"), InlineKeyboardButton("❓ Help", callback_data="help")]
+    ])
+
+async def delete_msg(msg, delay):
+    await asyncio.sleep(delay)
+    try: await msg.delete()
+    except: pass
