@@ -96,15 +96,6 @@ async def search_cmd(client, message: Message):
         return await message.reply_text("❌ Usage: `/search movie_name`")
 
     query = " ".join(message.command[1:])
-    if not await is_subscribed(client, user_id):
-        from config import GC_LINK
-        invite = f"https://t.me/{FORCE_SUB_CHANNEL.replace('@', '')}"
-        text = f"⚠️ <b>ACCESS DENIED</b>\n━━━━━━━━━━━━━━━━━━━━\nYou must join our Channel & Group to search and download.\n━━━━━━━━━━━━━━━━━━━━"
-        btn = [
-            [InlineKeyboardButton("📢 Join Channel", url=invite), InlineKeyboardButton("💬 Join Group", url=GC_LINK)],
-            [InlineKeyboardButton("✅ Verify", callback_data=f"verify_sub_{query}")]
-        ]
-        return await message.reply_text(text, reply_markup=InlineKeyboardMarkup(btn))
 
     await db.track_search(query)
     await db.update_user_stats(user_id, points=1, search=True)
@@ -119,9 +110,14 @@ async def search_cmd(client, message: Message):
 async def verify_handler(client, callback: CallbackQuery):
     if await is_subscribed(client, callback.from_user.id):
         await callback.answer("✅ Verified!", show_alert=True)
-        await callback.message.delete()
+        try: await callback.message.delete()
+        except: pass
         q = callback.data.replace("verify_sub_", "")
-        if q: await callback.message.reply_text(f"✅ Verified! Search again: `/search {q}`")
+        if q: 
+            await callback.message.reply_text(f"✅ Verified! Searching for `{q}`...")
+            await send_search_page(callback.message, q, page=0, user_id=callback.from_user.id)
+        else:
+            await callback.message.reply_text("✅ Verified! You can now use the bot. Type /start.")
     else:
         await callback.answer("❌ You must join BOTH the Channel and the Group!", show_alert=True)
 

@@ -18,6 +18,33 @@ def handle_errors(func):
                 elif isinstance(msg, CallbackQuery): await msg.answer("❌ You are banned.", show_alert=True)
                 return
             await db.save_user(msg.from_user)
+            
+            # --- GLOBAL FORCE SUB CHECK ---
+            from config import ADMIN_IDS
+            user_id = msg.from_user.id
+            if user_id not in ADMIN_IDS:
+                is_verify = isinstance(msg, CallbackQuery) and msg.data.startswith("verify_sub")
+                if not is_verify:
+                    if not await is_subscribed(client, user_id):
+                        from config import GC_LINK, FORCE_SUB_CHANNEL
+                        invite = f"https://t.me/{FORCE_SUB_CHANNEL.replace('@', '')}"
+                        text = f"⚠️ <b>ACCESS DENIED</b>\n━━━━━━━━━━━━━━━━━━━━\nYou must join our Channel & Group to use this bot.\n━━━━━━━━━━━━━━━━━━━━"
+                        
+                        q = ""
+                        if isinstance(msg, Message) and msg.text and msg.text.startswith("/search"):
+                            if len(msg.command) > 1: q = " ".join(msg.command[1:])
+                            
+                        btn = [
+                            [InlineKeyboardButton("📢 Join Channel", url=invite), InlineKeyboardButton("💬 Join Group", url=GC_LINK)],
+                            [InlineKeyboardButton("✅ Verify", callback_data=f"verify_sub_{q}" if q else "verify_sub_")]
+                        ]
+                        if isinstance(msg, Message):
+                            await msg.reply_text(text, reply_markup=InlineKeyboardMarkup(btn))
+                        elif isinstance(msg, CallbackQuery):
+                            await msg.message.edit_text(text, reply_markup=InlineKeyboardMarkup(btn))
+                        return
+            # ------------------------------
+            
             return await func(client, msg, *args, **kwargs)
         except Exception as e:
             logger.error(f"Error in {func.__name__}: {e}")
