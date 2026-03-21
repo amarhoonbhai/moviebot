@@ -3,11 +3,12 @@ from datetime import datetime
 # --- DESIGN SYSTEM ---
 DOT = "▪"
 
-def format_movie_card(name, year, rating, language, runtime, genres, director, cast, plot):
+def format_movie_card(name, year, rating, language, runtime, genres, director, cast, plot, seasons=None):
+    season_str = f" | <b>S:</b> <code>{seasons}</code>" if seasons else ""
     return (
         f"🎬 <b>{str(name).upper()}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"<b>{DOT} Release Year:</b>  <code>{year}</code> | <b>⏱</b> <code>{runtime}</code>\n"
+        f"<b>{DOT} Release Year:</b>  <code>{year}</code> | <b>⏱</b> <code>{runtime}</code>{season_str}\n"
         f"<b>{DOT} Genres:</b>  <code>{genres}</code>\n"
         f"<b>{DOT} TMDb Rating:</b>  <code>{rating}/10</code>\n"
         f"<b>{DOT} Director:</b>  <code>{director}</code>\n"

@@ -70,7 +70,7 @@ async def send_search_page(message_or_callback, query, page=0, user_id=None):
     cast = metadata.get('cast', 'Unknown') if metadata else 'Unknown'
     plot = metadata.get('plot', 'No plot available') if metadata else ''
     
-    text = format_movie_card(name, year, metadata['rating'] if metadata else "N/A", lang, runtime, genres, director, cast, plot)
+    text = format_movie_card(name, year, metadata['rating'] if metadata else "N/A", lang, runtime, genres, director, cast, plot, metadata.get('seasons') if metadata else None)
     
     if isinstance(message_or_callback, CallbackQuery):
         try:

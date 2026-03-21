@@ -9,13 +9,16 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+from pyrogram.enums import ParseMode
+
 # Initialize Bot with Plugins System
 bot = Client(
     "movie_bot",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
-    plugins=dict(root="plugins")
+    plugins=dict(root="plugins"),
+    parse_mode=ParseMode.HTML
 )
 
 scheduler = AsyncIOScheduler()

@@ -56,7 +56,7 @@ async def inline_search(client, query: InlineQuery):
         plot = metadata.get('plot', 'No plot available') if metadata else 'No plot available.'
         rating = metadata['rating'] if metadata else "N/A"
         
-        card_text = format_movie_card(name, year, rating, lang, runtime, genres, director, cast, plot)
+        card_text = format_movie_card(name, year, rating, lang, runtime, genres, director, cast, plot, metadata.get('seasons') if metadata else None)
         
         # Deep link to start bot with file ID
         bot_username = client.me.username if client.me else "Bot"
