@@ -2,7 +2,7 @@ import asyncio
 import logging
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram import enums
-from config import FORCE_SUB_CHANNEL
+from config import FORCE_SUB_CHANNEL, GROUP_ID
 from database import db
 
 logger = logging.getLogger(__name__)
@@ -31,11 +31,22 @@ def handle_errors(func):
     return wrapper
 
 async def is_subscribed(client, user_id):
-    if not FORCE_SUB_CHANNEL or FORCE_SUB_CHANNEL.lower() == "none": return True
     try:
-        member = await client.get_chat_member(FORCE_SUB_CHANNEL, user_id)
-        return member.status in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.MEMBER]
-    except Exception: return False
+        # Check Channel
+        if FORCE_SUB_CHANNEL and FORCE_SUB_CHANNEL.lower() != "none":
+            ch_member = await client.get_chat_member(FORCE_SUB_CHANNEL, user_id)
+            if ch_member.status not in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.MEMBER]:
+                return False
+                
+        # Check Group
+        if GROUP_ID:
+            gc_member = await client.get_chat_member(GROUP_ID, user_id)
+            if gc_member.status not in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.MEMBER]:
+                return False
+                
+        return True
+    except Exception:
+        return False
 
 async def show_loading(message: Message):
     frames = ["🎬 Loading", "🎬 Loading.", "🎬 Loading..", "🎬 Loading..."]

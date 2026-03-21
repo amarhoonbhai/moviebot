@@ -9,6 +9,14 @@ logger = logging.getLogger(__name__)
 
 @Client.on_inline_query()
 async def inline_search(client, query: InlineQuery):
+    from utils import is_subscribed
+    if not await is_subscribed(client, query.from_user.id):
+        return await query.answer(
+            results=[],
+            switch_pm_text="⚠️ Join Channel & Group to use inline search!",
+            switch_pm_parameter="start"
+        )
+        
     text = query.query.strip()
     if len(text) < 2:
         return await query.answer(

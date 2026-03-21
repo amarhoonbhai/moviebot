@@ -97,9 +97,13 @@ async def search_cmd(client, message: Message):
 
     query = " ".join(message.command[1:])
     if not await is_subscribed(client, user_id):
+        from config import GC_LINK
         invite = f"https://t.me/{FORCE_SUB_CHANNEL.replace('@', '')}"
-        text = f"⚠️ <b>ACCESS DENIED</b>\n━━━━━━━━━━━━━━━━━━━━\nJoin {FORCE_SUB_CHANNEL} to search and download.\n━━━━━━━━━━━━━━━━━━━━"
-        btn = [[InlineKeyboardButton("📢 Join Channel", url=invite)], [InlineKeyboardButton("✅ Verify", callback_data=f"verify_sub_{query}")]]
+        text = f"⚠️ <b>ACCESS DENIED</b>\n━━━━━━━━━━━━━━━━━━━━\nYou must join our Channel & Group to search and download.\n━━━━━━━━━━━━━━━━━━━━"
+        btn = [
+            [InlineKeyboardButton("📢 Join Channel", url=invite), InlineKeyboardButton("💬 Join Group", url=GC_LINK)],
+            [InlineKeyboardButton("✅ Verify", callback_data=f"verify_sub_{query}")]
+        ]
         return await message.reply_text(text, reply_markup=InlineKeyboardMarkup(btn))
 
     await db.track_search(query)
@@ -119,7 +123,7 @@ async def verify_handler(client, callback: CallbackQuery):
         q = callback.data.replace("verify_sub_", "")
         if q: await callback.message.reply_text(f"✅ Verified! Search again: `/search {q}`")
     else:
-        await callback.answer("❌ Still not joined!", show_alert=True)
+        await callback.answer("❌ You must join BOTH the Channel and the Group!", show_alert=True)
 
 @Client.on_callback_query(filters.regex(r'^spg_'))
 @handle_errors
